@@ -63,7 +63,10 @@ export function EventRow({ event, className }: { event: ChatEvent; className?: s
     case "viewerCount":
       return (
         <div className={cn(base, "text-muted-foreground", className)}>
-          <span>{event.count} viewers</span>
+          <span>
+            {event.count} viewers
+            {event.total !== undefined ? ` · ${event.total} total entered` : ""}
+          </span>
         </div>
       )
     case "streamEnd":

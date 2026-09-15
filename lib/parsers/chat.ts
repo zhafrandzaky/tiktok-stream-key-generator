@@ -146,9 +146,15 @@ export function normalizeWebcastEvent(eventName: string, data: unknown, at: numb
 
     case "roomUser": {
       if (!record) return null
-      const count = asCount(record.viewerCount) ?? asCount(record.totalUser) ?? asCount(record.total)
+      const count = asCount(record.viewerCount) ?? asCount(record.total) ?? asCount(record.totalUser)
       if (count === undefined) return null
-      return { type: "viewerCount", count, at }
+      const cumulative = asCount(record.totalUser)
+      return {
+        type: "viewerCount",
+        count,
+        ...(cumulative !== undefined && cumulative !== count ? { total: cumulative } : {}),
+        at,
+      }
     }
 
     case "streamEnd": {

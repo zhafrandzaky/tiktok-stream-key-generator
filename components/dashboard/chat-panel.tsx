@@ -108,15 +108,16 @@ export function ChatPanel() {
     return () => clearTimeout(id)
   }, [])
 
-  const viewerCount = useMemo(() => {
-    for (let index = events.length - 1; index >= 0; index -= 1) {
-      const event = events[index]
-      if (!event) continue
-      if (event.type === "viewerCount") return event.count
-      if (event.type === "member" && event.viewerCount !== undefined) return event.viewerCount
-    }
-    return undefined
-  }, [events])
+  const lastViewerEvent = events.findLast(
+    (event) =>
+      event.type === "viewerCount" || (event.type === "member" && event.viewerCount !== undefined),
+  )
+  const viewerStats =
+    lastViewerEvent?.type === "viewerCount"
+      ? { count: lastViewerEvent.count, total: lastViewerEvent.total }
+      : lastViewerEvent?.type === "member" && lastViewerEvent.viewerCount !== undefined
+        ? { count: lastViewerEvent.viewerCount, total: undefined }
+        : null
 
   const chatEvents = useMemo(() => events.filter((event) => event.type === "chat"), [events])
 
@@ -172,12 +173,20 @@ export function ChatPanel() {
           <MessagesSquare className="size-4 text-muted-foreground" />
           <h2 className="text-sm font-semibold tracking-tight">Live chat &amp; events</h2>
         </div>
-        <div className="flex items-center gap-2">
-          {viewerCount !== undefined ? (
-            <Badge variant="outline" className="rounded-lg tabular-nums">
-              <NumberTicker value={viewerCount} className="text-xs font-semibold" />
-              <span className="ml-1 text-xs text-muted-foreground">viewers</span>
-            </Badge>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {viewerStats ? (
+            <>
+              <Badge data-testid="viewer-count" variant="outline" className="rounded-lg tabular-nums">
+                <NumberTicker value={viewerStats.count} className="text-xs font-semibold" />
+                <span className="ml-1 text-xs text-muted-foreground">viewers</span>
+              </Badge>
+              {viewerStats.total !== undefined ? (
+                <Badge data-testid="viewer-total" variant="outline" className="rounded-lg tabular-nums">
+                  <NumberTicker value={viewerStats.total} className="text-xs font-semibold" />
+                  <span className="ml-1 text-xs text-muted-foreground">total entered</span>
+                </Badge>
+              ) : null}
+            </>
           ) : null}
           <Badge variant={connected ? "secondary" : "outline"} className="rounded-lg">
             {connected ? "Socket live" : "Socket idle"}

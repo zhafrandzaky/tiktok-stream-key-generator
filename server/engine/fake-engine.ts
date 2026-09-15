@@ -143,7 +143,7 @@ export function createFakeEngine(options: FakeEngineOptions = {}): EngineHandle 
     }),
     (at) => ({ type: "follow", user: { uniqueId: "carol", nickname: "Carol" }, at }),
     (at) => ({ type: "member", user: { uniqueId: "erin", nickname: "Erin" }, at }),
-    (at) => ({ type: "viewerCount", count: 128, at }),
+    (at) => ({ type: "viewerCount", count: 128, total: 1543, at }),
     (at) => ({ type: "chat", user: { uniqueId: "dave", nickname: "Dave" }, comment: "hello from demo", at }),
     (at) => ({ type: "streamEnd", reason: "action:3", at }),
   ]

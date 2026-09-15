@@ -112,13 +112,11 @@ export function ChatOverlay() {
     })
     .slice(-config.max)
 
-  const viewerCount = useMemo(() => {
-    for (let index = events.length - 1; index >= 0; index -= 1) {
-      const event = events[index]
-      if (event?.type === "viewerCount") return event.count
-    }
-    return undefined
-  }, [events])
+  const lastViewerEvent = events.findLast((event) => event.type === "viewerCount")
+  const viewerStats =
+    lastViewerEvent?.type === "viewerCount"
+      ? { count: lastViewerEvent.count, total: lastViewerEvent.total }
+      : null
 
   return (
     <div
@@ -128,14 +126,15 @@ export function ChatOverlay() {
       )}
       style={{ fontSize: `${config.fontSize}px` }}
     >
-      {config.showViewers && viewerCount !== undefined ? (
+      {config.showViewers && viewerStats ? (
         <div
           className={cn(
             "w-fit rounded-full px-3 py-1 text-[0.5em] font-medium",
             config.theme === "dark" ? "bg-black/45 text-white backdrop-blur-sm" : "bg-white/75 backdrop-blur-sm",
           )}
         >
-          {viewerCount} viewers
+          {viewerStats.count} viewers
+          {viewerStats.total !== undefined ? ` · ${viewerStats.total} total` : ""}
         </div>
       ) : null}
 

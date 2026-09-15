@@ -100,6 +100,23 @@ describe("normalizeWebcastEvent", () => {
     })
   })
 
+  it("prefers `total` for current viewers and reports `totalUser` as cumulative total", () => {
+    expect(normalizeWebcastEvent("roomUser", { total: "2675", totalUser: "368215" }, at)).toEqual({
+      type: "viewerCount",
+      count: 2675,
+      total: 368215,
+      at,
+    })
+  })
+
+  it("omits the cumulative total when it equals the current count", () => {
+    expect(normalizeWebcastEvent("roomUser", { total: 400, totalUser: 400 }, at)).toEqual({
+      type: "viewerCount",
+      count: 400,
+      at,
+    })
+  })
+
   it("normalizes streamEnd", () => {
     expect(normalizeWebcastEvent("streamEnd", { action: 3 }, at)).toEqual({
       type: "streamEnd",

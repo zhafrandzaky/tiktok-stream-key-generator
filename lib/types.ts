@@ -21,7 +21,7 @@ export type ChatEvent =
   | { type: "share"; user: ChatUser; at: number }
   | { type: "like"; user?: ChatUser; count: number; total?: number; at: number }
   | { type: "member"; user: ChatUser; viewerCount?: number; at: number }
-  | { type: "viewerCount"; count: number; at: number }
+  | { type: "viewerCount"; count: number; total?: number; at: number }
   | { type: "streamEnd"; reason?: string; at: number }
 
 export type LiveRoomResult = {

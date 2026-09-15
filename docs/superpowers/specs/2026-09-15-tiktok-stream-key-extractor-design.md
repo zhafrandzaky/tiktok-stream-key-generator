@@ -330,7 +330,7 @@ protobuf typings, so `lib/parsers/chat.ts` reads the live shapes with fallbacks:
 | user handle | `displayId` | `idStr`, `userId`, `id` (there is **no** `uniqueId`) |
 | user avatar | `avatarThumb.urlList[0]` | `avatarMedium/Large`, `profilePictureUrl` |
 | like | `count`, `total` (string) | `likeCount`, `totalLikeCount` |
-| room users | `totalUser` (string) | `viewerCount`, `total` |
+| room users | `total` (current viewers, fluctuates) + `totalUser` (cumulative entered, grows) | `viewerCount`, `total` |
 | gift streak | `repeatEnd` numeric 0/1 | boolean/string forms |
 | social | `followCount` / `shareCount` | `action` text |
 

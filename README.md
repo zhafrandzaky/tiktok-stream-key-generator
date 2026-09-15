@@ -85,7 +85,7 @@ Overlay query parameters:
 | `showGifts` | `1` | Show gift rows |
 | `showLikes` | `0` | Show like rows |
 | `showFollows` | `1` | Show follow/share rows |
-| `showViewers` | `1` | Show the viewer-count chip |
+| `showViewers` | `1` | Show the viewer chip (current viewers + total entered) |
 | `showStatus` | `1` | Show connection/status rows |
 | `chip` | `1` | Draw translucent chips behind rows |
 
