@@ -6,14 +6,16 @@ import { ThemeToggle } from "@/components/theme-toggle"
 export default function Home() {
   return (
     <main className="mx-auto flex w-full max-w-[1680px] flex-1 flex-col p-4 sm:p-6 lg:p-8">
-      <header className="mb-6 flex items-center justify-between gap-4">
-        <div>
+      <header className="relative mb-6 flex items-center justify-center gap-4">
+        <div className="text-center">
           <h1 className="text-lg font-semibold tracking-tight">TikTok Live Studio Kit</h1>
           <p className="text-sm text-muted-foreground">
             Stream key extractor &amp; real-time chat reader for OBS
           </p>
         </div>
-        <ThemeToggle />
+        <div className="absolute right-0 top-1/2 -translate-y-1/2">
+          <ThemeToggle />
+        </div>
       </header>
 
       <div className="grid flex-1 gap-6 lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)]">
