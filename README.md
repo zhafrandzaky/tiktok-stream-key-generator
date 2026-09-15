@@ -91,7 +91,7 @@ Copy `.env.example` to `.env` if you want to override defaults:
 | Env | Default | Purpose |
 |---|---|---|
 | `PORT` | `3000` | HTTP + WebSocket port |
-| `DATA_DIR` | `.data` | Session state, Chromium profile, debug artifacts |
+| `DATA_DIR` | `.data` | Session state, Chromium profile, debug artifacts, and `session/rate-limit.json` — the persisted QR/login cooldown (`{ until, level }`). Deleting that file resets the local cooldown, but TikTok's server-side limit may still be active. |
 | `SIGN_API_KEY` | — | Optional [Euler Stream](https://www.eulerstream.com) key for the chat connector (higher rate limits) |
 | `TIKTOK_HEADLESS` | `1` | Set to `0` to always open a visible browser window |
 | `E2E_MOCK_TIKTOK` | — | `1` runs the deterministic fake engine (used by tests) |
