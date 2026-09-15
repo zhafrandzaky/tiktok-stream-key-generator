@@ -9,7 +9,8 @@ import {
 import type { SessionState } from "@/lib/types"
 import type { BrowserManager } from "./browser"
 import type { AuthController, AuthQr, AuthStatus, LoginMode } from "./engine"
-import { AlreadyAuthenticatedError, LoginPageFailedError, LoginRateLimitedError } from "./errors"
+import { AlreadyAuthenticatedError, LoginPageFailedError, LoginRateLimitedError, SessionImportFailedError } from "./errors"
+import { importFirefoxSession } from "./firefox-import"
 import { computeRateLimitHit, createRateLimitStore, type RateLimitStore } from "./rate-limit-store"
 import type { SessionStore } from "./session-store"
 
@@ -517,6 +518,34 @@ export function createAuthManager(deps: {
 
     async session(): Promise<SessionState> {
       return resolveStoredSession()
+    },
+
+    async importFromFirefox(): Promise<SessionState> {
+      const imported = await importFirefoxSession()
+      if (!imported) throw new SessionImportFailedError()
+
+      const context = await deps.browsers.getContext()
+      await context.clearCookies().catch(() => undefined)
+      await context.addCookies(imported.cookies)
+      const cookies = await context.cookies()
+      if (!hasSessionCookie(cookies)) {
+        throw new SessionImportFailedError(
+          "The Firefox session could not be transferred to the app browser. Try logging in again in Firefox.",
+        )
+      }
+
+      const state = await context.storageState().catch(() => null)
+      if (state) await deps.store.writeState(state)
+
+      stopPolling()
+      session = { status: "authenticated" }
+      qr = null
+      qrMeta = null
+      detail = `Imported session from Firefox (${imported.profilePath}).`
+      activeMode = null
+      parked = false
+      await clearRateLimit()
+      return session
     },
   }
 }

@@ -13,6 +13,7 @@ function createTestEngine(overrides: Partial<EngineHandle> = {}): EngineHandle {
       status: async () => ({ status: "anonymous" }),
       logout: async () => {},
       session: async () => ({ status: "anonymous" }),
+      importFromFirefox: async () => ({ status: "authenticated" as const }),
     },
     live: {
       create: async () => ({ rtmpUrl: "", streamKey: "", applied: [] }),

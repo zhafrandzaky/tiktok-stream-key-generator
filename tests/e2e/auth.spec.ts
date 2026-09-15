@@ -47,6 +47,13 @@ test("supports the browser-window login fallback", async ({ page }) => {
   await expect(page.getByText("Connected")).toBeVisible({ timeout: 10_000 })
 })
 
+test("imports the session from Firefox", async ({ page }) => {
+  await page.goto("/")
+  await page.getByRole("button", { name: /import session from firefox/i }).click()
+  await expect(page.getByText("Connected")).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByText("@demo_user", { exact: true })).toBeVisible()
+})
+
 test("signs out back to the QR state", async ({ page }) => {
   await ensureSignedIn(page)
   await page.getByRole("button", { name: /sign out/i }).click()

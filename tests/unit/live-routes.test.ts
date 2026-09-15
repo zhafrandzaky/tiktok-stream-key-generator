@@ -26,6 +26,7 @@ function createTestEngine(overrides: Partial<EngineHandle> = {}): EngineHandle {
       status: async () => ({ status: "authenticated" }),
       logout: async () => {},
       session: async () => ({ status: "authenticated" }),
+      importFromFirefox: async () => ({ status: "authenticated" }),
     },
     live: {
       create: async () => room,

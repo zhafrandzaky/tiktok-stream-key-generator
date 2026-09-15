@@ -214,6 +214,15 @@ Route handlers are thin: validate input, call engine, map typed errors to HTTP c
   a reliable path when QR checks are rate-limited.
 - Session detection remains cookie-authoritative (`sessionid` present → persist
   `storageState` atomically to `.data/session/storageState.json`), polled every second.
+- **Firefox session import (added after live testing).** TikTok's risk engine rejects the
+  bundled Chromium for login (QR *and* password) while the operator's normal Firefox logs in
+  fine. `POST /api/auth/import/firefox` reads the Firefox profile's `cookies.sqlite` (via
+  `node:sqlite`, Node 22.5+, with `-wal`/`-shm` copied for a consistent snapshot), maps
+  `moz_cookies` rows to Chromium cookie parameters (Firefox stores millisecond expiry;
+  Playwright expects seconds), clears stale cookies in the app browser, injects the imported
+  set, verifies `sessionid`, and persists a fresh `storageState`. The live-studio URL was
+  corrected to `https://www.tiktok.com/tiktokstudio/live` (`/live/create` returns 404;
+  `/creator-center/live` redirects to tiktokstudio).
 
 ### 5.2 Create live room / extract stream key
 

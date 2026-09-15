@@ -8,7 +8,7 @@ import type { AuthController, LiveController } from "./engine"
 import { AuthRequiredError, ExtractionFailedError, NotEligibleError } from "./errors"
 
 export const LIVE_URL_CANDIDATES = [
-  "https://www.tiktok.com/live/create",
+  "https://www.tiktok.com/tiktokstudio/live",
   "https://www.tiktok.com/creator-center/live",
 ]
 
@@ -32,9 +32,11 @@ export const LIVE_SELECTORS = {
   ],
   goLive: [
     'button:has-text("Go LIVE")',
+    'a:has-text("Go LIVE")',
+    '[role="link"]:has-text("Go LIVE")',
+    'text="Go LIVE"',
     'button:has-text("Go Live")',
     'button:has-text("Start LIVE")',
-    'button:has-text("Create")',
     '[data-e2e*="go-live" i]',
   ],
   endLive: [

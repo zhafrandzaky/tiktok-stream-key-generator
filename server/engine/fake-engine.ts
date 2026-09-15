@@ -96,6 +96,14 @@ export function createFakeEngine(options: FakeEngineOptions = {}): EngineHandle 
     async session(): Promise<SessionState> {
       return session
     },
+
+    async importFromFirefox(): Promise<SessionState> {
+      stopLoginTimer()
+      qr = null
+      activeMode = null
+      session = { status: "authenticated", uniqueId: "demo_user", nickname: "Demo User" }
+      return session
+    },
   }
 
   const live: LiveController = {

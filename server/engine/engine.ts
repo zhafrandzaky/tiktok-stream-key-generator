@@ -34,6 +34,7 @@ export interface AuthController {
   status(): Promise<AuthStatus>
   logout(): Promise<void>
   session(): Promise<SessionState>
+  importFromFirefox(): Promise<SessionState>
 }
 
 export interface LiveController {

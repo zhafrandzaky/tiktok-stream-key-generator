@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest"
 import { POST as logoutRoute } from "@/app/api/auth/logout/route"
+import { POST as importRoute } from "@/app/api/auth/import/firefox/route"
 import { POST as startRoute } from "@/app/api/auth/login/start/route"
 import { GET as statusRoute } from "@/app/api/auth/login/status/route"
 import { GET as sessionRoute } from "@/app/api/auth/session/route"
-import { CaptchaError, LoginRateLimitedError } from "@/server/engine/errors"
+import { CaptchaError, LoginRateLimitedError, SessionImportFailedError } from "@/server/engine/errors"
 import { setEngine, type EngineHandle } from "@/server/engine/singleton"
 
 function createTestEngine(overrides: Partial<EngineHandle> = {}): EngineHandle {
@@ -15,6 +16,7 @@ function createTestEngine(overrides: Partial<EngineHandle> = {}): EngineHandle {
       status: async () => ({ status: "anonymous" }),
       logout: async () => {},
       session: async () => ({ status: "anonymous" }),
+      importFromFirefox: async () => ({ status: "authenticated" as const }),
     },
     live: {
       create: async () => ({ rtmpUrl: "", streamKey: "", applied: [] }),
@@ -176,6 +178,36 @@ describe("auth routes", () => {
     )
     const res = await sessionRoute()
     expect(await res.json()).toEqual({ status: "authenticated", uniqueId: "demo" })
+  })
+
+  it("imports a Firefox session", async () => {
+    setEngine(
+      createTestEngine({
+        auth: {
+          ...createTestEngine().auth,
+          importFromFirefox: async () => ({ status: "authenticated", uniqueId: "ff_user" }),
+        },
+      }),
+    )
+    const res = await importRoute()
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ status: "authenticated", uniqueId: "ff_user" })
+  })
+
+  it("maps a missing Firefox session to 404", async () => {
+    setEngine(
+      createTestEngine({
+        auth: {
+          ...createTestEngine().auth,
+          importFromFirefox: async () => {
+            throw new SessionImportFailedError()
+          },
+        },
+      }),
+    )
+    const res = await importRoute()
+    expect(res.status).toBe(404)
+    expect((await res.json()).error.code).toBe("NO_SESSION_FOUND")
   })
 
   it("returns 503 when the engine is unavailable", async () => {

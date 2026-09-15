@@ -63,6 +63,14 @@ export class LoginRateLimitedError extends EngineError {
   }
 }
 
+export class SessionImportFailedError extends EngineError {
+  constructor(
+    message = "No TikTok session found in Firefox. Log in to tiktok.com in Firefox first, then import again.",
+  ) {
+    super(message, "NO_SESSION_FOUND")
+  }
+}
+
 export class ExtractionFailedError extends EngineError {
   constructor(message = "Could not extract the stream key from TikTok.") {
     super(message, "EXTRACTION_FAILED")

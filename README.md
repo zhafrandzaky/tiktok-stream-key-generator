@@ -23,6 +23,11 @@ made for OBS Browser Sources.
   enforced across restarts) and offers *Open login window*: a visible browser opens directly
   on TikTok's email/password form — a page that never calls the rate-limited QR endpoint. Sign
   in there and the app picks up the session automatically.
+- **Import the session from Firefox.** If TikTok blocks the automated browser entirely
+  (login works in your normal browser but not in the app), log in at `tiktok.com` in Firefox
+  once and click *Import session from Firefox*: the app reads the Firefox cookie database
+  (Node 22.5+), transfers `sessionid` and friends into its own browser, and stores the session
+  in `.data/session/storageState.json`. No second login required.
 - **Stream key extraction.** Fill in the live title, category and age restriction, click
   *Create live room*, and the app intercepts TikTok's own response to return the RTMP server
   URL and stream key. Sessions persist under `.data/` so you do not log in every time.
@@ -141,6 +146,10 @@ QR/login and chat events are scripted. For manual visual checks, start the dev s
   it on the dashboard. Stop all login attempts for 15–60 minutes — retrying extends the block —
   then try again. If it persists for hours, switch network (e.g. phone hotspot) or wait longer;
   the block is entirely on TikTok's side and cannot be bypassed.
+- **Login works in my normal browser but not in the app** — TikTok's risk engine flags the
+  bundled Chromium used for automation. Log in at `tiktok.com` in Firefox, then click
+  **Import session from Firefox** in the dashboard. Override the profile search with
+  `FIREFOX_PROFILE_DIR` if your profile lives somewhere unusual.
 - **`ENGINE_UNAVAILABLE` / "Engine is not running"** — start the app with `npm run dev`
   (a plain `next dev` has no engine process).
 - **"The TikTok session expired"** — click *Switch account* and scan a fresh QR code.

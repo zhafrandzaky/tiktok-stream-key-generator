@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import Image from "next/image"
-import { Loader2, LogOut, QrCode, RefreshCw, ShieldCheck, UserRound } from "lucide-react"
+import { Import, Loader2, LogOut, QrCode, RefreshCw, ShieldCheck, UserRound } from "lucide-react"
 import { toast } from "sonner"
 import { GlassPanel } from "@/components/glass-panel"
 import { Badge } from "@/components/ui/badge"
@@ -153,6 +153,19 @@ export function AuthCard() {
   const switchAccount = async () => {
     await logout()
     await startLogin()
+  }
+
+  const importFromFirefox = async () => {
+    setBusy(true)
+    try {
+      await apiPost("/api/auth/import/firefox")
+      toast.success("Imported the TikTok session from Firefox")
+      await refreshStatus()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not import the Firefox session")
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -317,6 +330,22 @@ export function AuthCard() {
               {busy ? <Loader2 className="size-4 animate-spin" /> : <QrCode className="size-4" />}
               Sign in with TikTok
             </Button>
+          </div>
+          <div className="space-y-1.5 pt-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="focus-glass rounded-xl"
+              disabled={busy}
+              onClick={importFromFirefox}
+            >
+              <Import className="size-4" />
+              Import session from Firefox
+            </Button>
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              Already logged in at tiktok.com in Firefox on this machine? Import that session — the
+              app reuses it for stream keys and chat, no second login required.
+            </p>
           </div>
         </div>
       )}
