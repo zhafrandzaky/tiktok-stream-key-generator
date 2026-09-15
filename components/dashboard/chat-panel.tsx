@@ -203,7 +203,7 @@ export function ChatPanel() {
           <h2 className="text-sm font-semibold tracking-tight">Live chat &amp; events</h2>
         </div>
         {hasStats ? (
-          <div className="order-2 flex w-full flex-wrap items-center gap-2 lg:order-1 lg:w-auto">
+          <div className="order-2 flex w-full flex-wrap items-center justify-center gap-2 lg:order-1 lg:w-auto lg:justify-end">
             {statBadges}
           </div>
         ) : null}
