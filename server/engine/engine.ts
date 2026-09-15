@@ -46,6 +46,7 @@ export interface ChatController {
 
 export interface EngineHandle {
   getStatus(): Promise<EngineStatus>
+  dispose(): Promise<void>
   auth: AuthController
   live: LiveController
   chat: ChatController
@@ -77,6 +78,10 @@ export function createEngine(deps: EngineDeps): EngineHandle {
     auth,
     live,
     chat,
+    async dispose(): Promise<void> {
+      await chat.disconnect().catch(() => undefined)
+      await browsers.dispose()
+    },
     async getStatus(): Promise<EngineStatus> {
       const session = await auth.session()
       const liveStatus = await live.status()

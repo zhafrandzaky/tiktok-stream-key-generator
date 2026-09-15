@@ -77,7 +77,12 @@ function stripQueryKey(url: string, keys: string[]): { rtmpUrl: string; streamKe
   for (const key of keys) {
     const match = new RegExp(`([?&])${key}=([^&]*)`).exec(url)
     if (!match) continue
-    const streamKey = decodeURIComponent(match[2] ?? "")
+    let streamKey = ""
+    try {
+      streamKey = decodeURIComponent(match[2] ?? "")
+    } catch {
+      continue
+    }
     if (!streamKey) continue
     const cleaned = url
       .replace(new RegExp(`([?&])${key}=[^&]*`), (_, sep: string) => (sep === "?" ? "?" : ""))
@@ -115,13 +120,25 @@ export function extractRtmp(input: string): {
   if (!fields) throw new RtmpParseError("No RTMP fields found in the payload")
 
   if (fields.streamKey) {
-    const serverUrl = fields.streamUrl ?? fields.pushUrl
-    if (!serverUrl) throw new RtmpParseError("Found a stream key without a server URL")
-    return {
-      rtmpUrl: serverUrl,
-      streamKey: fields.streamKey,
-      combinedPushUrl: buildCombined(serverUrl, fields.streamKey),
+    if (fields.streamUrl) {
+      return {
+        rtmpUrl: fields.streamUrl,
+        streamKey: fields.streamKey,
+        combinedPushUrl: buildCombined(fields.streamUrl, fields.streamKey),
+      }
     }
+    if (fields.pushUrl) {
+      const split =
+        stripQueryKey(fields.pushUrl, ["stream_key", "key", "streamKey"]) ??
+        splitPathKey(fields.pushUrl)
+      const rtmpUrl = split?.rtmpUrl ?? fields.pushUrl
+      return {
+        rtmpUrl,
+        streamKey: fields.streamKey,
+        combinedPushUrl: buildCombined(rtmpUrl, fields.streamKey),
+      }
+    }
+    throw new RtmpParseError("Found a stream key without a server URL")
   }
 
   if (fields.pushUrl) {

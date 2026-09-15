@@ -7,6 +7,7 @@ import { setEngine, type EngineHandle } from "@/server/engine/singleton"
 function createTestEngine(overrides: Partial<EngineHandle> = {}): EngineHandle {
   return {
     getStatus: async () => ({ ok: true, mode: "fake", auth: "anonymous", live: false }),
+    dispose: async () => {},
     auth: {
       start: async () => ({ qrDataUrl: "x", expiresAt: 1, version: 1 }),
       status: async () => ({ status: "anonymous" }),

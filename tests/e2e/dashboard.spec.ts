@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test"
+import { expect, test } from "./fixtures"
 import { createLiveRoom, ensureSignedIn } from "./helpers"
 
 test("creates a live room, masks and copies the stream key, then ends the stream", async ({ page }) => {

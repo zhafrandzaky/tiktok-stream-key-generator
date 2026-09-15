@@ -1,6 +1,6 @@
-import { mkdir, writeFile } from "node:fs/promises"
+import { chmod, mkdir, writeFile } from "node:fs/promises"
 import path from "node:path"
-import type { Page, Response } from "playwright"
+import type { Locator, Page, Response } from "playwright"
 import { extractRtmp, RtmpParseError } from "@/lib/parsers/rtmp"
 import type { LiveRoomResult, LiveStatus } from "@/lib/types"
 import type { BrowserManager } from "./browser"
@@ -18,6 +18,12 @@ export const LIVE_SELECTORS = {
     'textarea[placeholder*="title" i]',
     'input[name*="title" i]',
     'textarea[name*="title" i]',
+  ],
+  category: [
+    'button:has-text("Category")',
+    'button:has-text("Topic")',
+    '[data-e2e*="category" i]',
+    '[data-e2e*="topic" i]',
   ],
   ageRestricted: [
     'input[type="checkbox"][name*="age" i]',
@@ -58,6 +64,12 @@ export function couldContainRtmp(contentType: string | null, body: string): bool
 
 type DomInput = { name: string; id: string; value: string }
 
+async function readToggleState(locator: Locator): Promise<boolean | null> {
+  const aria = await locator.getAttribute("aria-checked").catch(() => null)
+  if (aria !== null) return aria === "true"
+  return locator.isChecked().catch(() => null)
+}
+
 export function createLiveRoom(deps: {
   browsers: BrowserManager
   auth: AuthController
@@ -71,9 +83,10 @@ export function createLiveRoom(deps: {
   const artifact = async (page: Page, payloads: string[]): Promise<string> => {
     const stamp = new Date().toISOString().replace(/[:.]/g, "-")
     const dir = path.join(deps.dataDir, "artifacts")
-    await mkdir(dir, { recursive: true })
+    await mkdir(dir, { recursive: true, mode: 0o700 })
     const screenshotPath = path.join(dir, `live-create-${stamp}.png`)
     await page.screenshot({ path: screenshotPath, fullPage: true }).catch(() => undefined)
+    await chmod(screenshotPath, 0o600).catch(() => undefined)
     const metaPath = path.join(dir, `live-create-${stamp}.json`)
     const keys = new Set<string>()
     for (const payload of payloads) {
@@ -91,9 +104,9 @@ export function createLiveRoom(deps: {
         continue
       }
     }
-    await writeFile(metaPath, JSON.stringify({ responseKeys: [...keys].sort() }, null, 2)).catch(
-      () => undefined,
-    )
+    await writeFile(metaPath, JSON.stringify({ responseKeys: [...keys].sort() }, null, 2), {
+      mode: 0o600,
+    }).catch(() => undefined)
     return screenshotPath
   }
 
@@ -174,7 +187,7 @@ export function createLiveRoom(deps: {
         void response
           .text()
           .then((text) => {
-            if (couldContainRtmp(contentType, text)) payloads.push(text)
+            if (payloads.length < 200 && couldContainRtmp(contentType, text)) payloads.push(text)
           })
           .catch(() => undefined)
       }
@@ -187,10 +200,29 @@ export function createLiveRoom(deps: {
         applied.push("title")
       }
 
+      if (input.category) {
+        const categoryTrigger = await findVisible(page, LIVE_SELECTORS.category)
+        if (categoryTrigger) {
+          await categoryTrigger.click().catch(() => undefined)
+          const option = page.getByRole("option", { name: input.category }).first()
+          const optionVisible = await option
+            .isVisible({ timeout: 1000 })
+            .then((visible) => visible)
+            .catch(() => false)
+          if (optionVisible) {
+            await option.click().catch(() => undefined)
+            applied.push("category")
+          } else {
+            await page.keyboard.press("Escape").catch(() => undefined)
+          }
+        }
+      }
+
       if (input.ageRestricted) {
         const toggle = await findVisible(page, LIVE_SELECTORS.ageRestricted)
         if (toggle) {
-          await toggle.click().catch(() => undefined)
+          const isOn = await readToggleState(toggle)
+          if (isOn !== true) await toggle.click().catch(() => undefined)
           applied.push("ageRestricted")
         }
       }

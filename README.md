@@ -98,8 +98,10 @@ the Next bundle and is reached from route handlers through a `globalThis` single
 heavy dependency is ever bundled into the app. All external payloads are normalized by pure
 parsers in `lib/parsers/`, which is where the unit tests concentrate.
 
-Debug artifacts from failed extractions are written to `.data/artifacts/` (screenshots and
-response key names only — never stream keys).
+Debug artifacts from failed extractions are written to `.data/artifacts/` (directory mode `0700`,
+files `0600`). The screenshot is a full-page capture of TikTok's creator page, so it may itself
+contain the stream key — treat the folder as sensitive, and it is gitignored along with the rest
+of `.data/`.
 
 ## Testing
 
@@ -110,7 +112,9 @@ npm run test:e2e     # Playwright, runs against the fake engine
 ```
 
 E2E tests never touch TikTok: `E2E_MOCK_TIKTOK=1` swaps in a deterministic fake engine whose
-QR/login and chat events are scripted. Visual smoke helpers live in `scripts/smoke-auth.mjs`.
+QR/login and chat events are scripted. For manual visual checks, start the dev server with
+`E2E_MOCK_TIKTOK=1` and run `BASE=http://localhost:3000 node scripts/smoke-auth.mjs`
+(override the screenshot folder with `OUT_DIR`).
 
 ## Troubleshooting
 

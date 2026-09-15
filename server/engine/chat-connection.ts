@@ -36,9 +36,16 @@ function isOfflineError(error: unknown): boolean {
   return /offline/i.test(name) || /offline/i.test(message) || /not (currently )?live/i.test(message)
 }
 
+function redactSecrets(message: string): string {
+  return message.replace(
+    /((?:sign|signapi|api[_-]?key|apikey|sessionid|token|key))=([^&\s]+)/gi,
+    "$1=REDACTED",
+  )
+}
+
 function sanitizeMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error)
-  return message.replace(/\s+/g, " ").slice(0, 200)
+  return redactSecrets(message.replace(/\s+/g, " ")).slice(0, 200)
 }
 
 export function createChatConnection(deps: {
@@ -61,7 +68,12 @@ export function createChatConnection(deps: {
   let streamEnded = false
 
   const publish = (event: ChatEvent | null) => {
-    if (event) deps.bus.publish(event)
+    if (!event) return
+    if (event.type === "status" && event.detail) {
+      deps.bus.publish({ ...event, detail: redactSecrets(event.detail).slice(0, 300) })
+      return
+    }
+    deps.bus.publish(event)
   }
 
   const clearReconnect = () => {

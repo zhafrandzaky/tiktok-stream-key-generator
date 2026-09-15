@@ -13,6 +13,7 @@ export interface BrowserManager {
 export function createBrowserManager(opts: { dataDir: string; headless: boolean }): BrowserManager {
   const userDataDir = path.join(opts.dataDir, "browser-profile")
   let context: BrowserContext | null = null
+  let pending: Promise<BrowserContext> | null = null
   let headless = opts.headless
 
   async function launch(nextHeadless: boolean): Promise<BrowserContext> {
@@ -20,19 +21,32 @@ export function createBrowserManager(opts: { dataDir: string; headless: boolean 
       await context.close().catch(() => undefined)
       context = null
     }
-    context = await chromium.launchPersistentContext(userDataDir, {
+    const launched = await chromium.launchPersistentContext(userDataDir, {
       headless: nextHeadless,
       viewport: { width: 1280, height: 800 },
       locale: "en-US",
     })
+    launched.on("close", () => {
+      if (context === launched) context = null
+    })
+    context = launched
     headless = nextHeadless
-    return context
+    return launched
+  }
+
+  async function ensureContext(): Promise<BrowserContext> {
+    if (context) return context
+    if (!pending) {
+      pending = launch(headless).finally(() => {
+        pending = null
+      })
+    }
+    return pending
   }
 
   return {
     async getContext(): Promise<BrowserContext> {
-      if (context) return context
-      return launch(headless)
+      return ensureContext()
     },
 
     currentContext(): BrowserContext | null {

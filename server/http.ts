@@ -39,6 +39,10 @@ export async function jsonRoute(handler: () => Promise<unknown>): Promise<NextRe
 }
 
 export async function readJsonBody<T>(req: Request): Promise<T> {
+  const contentType = req.headers.get("content-type") ?? ""
+  if (!contentType.toLowerCase().includes("application/json")) {
+    throw new EngineError("Content-Type must be application/json.", "BAD_REQUEST")
+  }
   try {
     return (await req.json()) as T
   } catch {

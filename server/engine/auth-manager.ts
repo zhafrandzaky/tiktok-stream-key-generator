@@ -88,12 +88,24 @@ export function createAuthManager(deps: {
   let pollTimer: ReturnType<typeof setInterval> | null = null
   let pollBusy = false
   let captchaRelaunched = false
+  let loginPage: Page | null = null
 
   const stopPolling = () => {
     if (pollTimer) {
       clearInterval(pollTimer)
       pollTimer = null
     }
+  }
+
+  const resolveStoredSession = async (): Promise<SessionState> => {
+    if (session.status === "authenticated") return session
+    const stored = (await deps.store.readState()) as {
+      cookies?: Array<{ name: string; value: string }>
+    } | null
+    if (stored?.cookies?.length && hasSessionCookie(stored.cookies)) {
+      session = { status: "authenticated" }
+    }
+    return session
   }
 
   const findVisible = async (page: Page, selectors: string[]): Promise<Locator | null> => {
@@ -131,7 +143,12 @@ export function createAuthManager(deps: {
     const next = bumpQrVersion(qrMeta, hashBuffer(buffer))
     const changed = next.changed
     qrMeta = { hash: next.hash, version: next.version }
-    if (!changed && qr) return qr
+    if (!changed && qr) {
+      if (qr.expiresAt - Date.now() < 30_000) {
+        qr = { ...qr, expiresAt: Date.now() + 120_000 }
+      }
+      return qr
+    }
     qr = {
       qrDataUrl: `data:image/png;base64,${buffer.toString("base64")}`,
       expiresAt: Date.now() + 120_000,
@@ -141,16 +158,15 @@ export function createAuthManager(deps: {
   }
 
   const openLoginPage = async (context: BrowserContext): Promise<Page> => {
+    const page = loginPage && !loginPage.isClosed() ? loginPage : await context.newPage()
+    loginPage = page
+
     for (const url of loginUrls) {
-      const page = await context.newPage()
       const loaded = await page
         .goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 })
         .then(() => true)
         .catch(() => false)
-      if (!loaded) {
-        await page.close().catch(() => undefined)
-        continue
-      }
+      if (!loaded) continue
 
       if (await findVisible(page, QR_SELECTORS)) return page
 
@@ -163,7 +179,6 @@ export function createAuthManager(deps: {
       }
 
       if (await findVisible(page, QR_SELECTORS)) return page
-      await page.close().catch(() => undefined)
     }
     throw new LoginPageFailedError()
   }
@@ -184,7 +199,7 @@ export function createAuthManager(deps: {
     stopPolling()
     const state = await context.storageState().catch(() => null)
     if (state) await deps.store.writeState(state).catch(() => undefined)
-    const page = context.pages().at(-1)
+    const page = loginPage ?? context.pages().at(-1)
     const identity = page ? (await readIdentity(page).catch(() => null)) : null
     session = { status: "authenticated", ...(identity ?? {}) }
     qr = null
@@ -203,7 +218,7 @@ export function createAuthManager(deps: {
         await completeLogin(context)
         return
       }
-      const page = context.pages().at(-1)
+      const page = loginPage && !loginPage.isClosed() ? loginPage : context.pages().at(-1)
       if (!page) return
       const hasQr = Boolean(await findVisible(page, QR_SELECTORS))
       const hasCaptcha = Boolean(await findVisible(page, CAPTCHA_SELECTORS))
@@ -214,14 +229,10 @@ export function createAuthManager(deps: {
         if (!deps.browsers.isHeaded() && !captchaRelaunched) {
           captchaRelaunched = true
           const relaunched = await deps.browsers.relaunchHeaded()
-          const loginPage = await openLoginPage(relaunched).catch(() => null)
-          if (loginPage) await captureQr(loginPage)
+          loginPage = null
+          const loginPageOpened = await openLoginPage(relaunched).catch(() => null)
+          if (loginPageOpened) await captureQr(loginPageOpened)
         }
-        return
-      }
-
-      if (state === "logged-in") {
-        await completeLogin(context)
         return
       }
 
@@ -249,14 +260,15 @@ export function createAuthManager(deps: {
       if (!captured) throw new LoginPageFailedError()
       if (!pollTimer) {
         pollTimer = setInterval(() => {
-          void pollOnce()
+          pollOnce().catch(() => undefined)
         }, pollMs)
       }
       return captured
     },
 
     async status(): Promise<AuthStatus> {
-      return { ...session, ...(qr ? { qr } : {}), ...(detail ? { detail } : {}) }
+      const current = await resolveStoredSession()
+      return { ...current, ...(qr ? { qr } : {}), ...(detail ? { detail } : {}) }
     },
 
     async logout(): Promise<void> {
@@ -266,14 +278,14 @@ export function createAuthManager(deps: {
       qrMeta = null
       detail = undefined
       captchaRelaunched = false
+      loginPage = null
       await deps.store.clear().catch(() => undefined)
       await deps.browsers.clearCookies()
+      await deps.browsers.dispose()
     },
 
     async session(): Promise<SessionState> {
-      if (session.status === "authenticated") return session
-      const stored = await deps.store.readState()
-      return stored ? { status: "authenticated" } : session
+      return resolveStoredSession()
     },
   }
 }

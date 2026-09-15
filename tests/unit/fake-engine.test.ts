@@ -49,18 +49,23 @@ describe("fake engine contract", () => {
   })
 
   it("requires auth before creating a live room and returns fixed credentials", async () => {
-    const engine = createFakeEngine({ loginDelayMs: 10 })
+    vi.useFakeTimers()
+    const engine = createFakeEngine({ loginDelayMs: 10, roomDelayMs: 10 })
     await expect(engine.live.create({ title: "Test" })).rejects.toBeInstanceOf(AuthRequiredError)
 
     await engine.auth.start()
-    await new Promise((resolve) => setTimeout(resolve, 50))
-    const room = await engine.live.create({ title: "Test" })
+    await vi.advanceTimersByTimeAsync(20)
+
+    const pendingRoom = engine.live.create({ title: "Test" })
+    await vi.advanceTimersByTimeAsync(20)
+    const room = await pendingRoom
     expect(room.streamKey).toBe("sk_fake_1234567890")
     expect(room.rtmpUrl).toBe("rtmp://fake.push.example.com/live")
     expect((await engine.live.status()).live).toBe(true)
 
     await engine.live.end()
     expect((await engine.live.status()).live).toBe(false)
+    vi.useRealTimers()
   })
 
   it("reports status", async () => {

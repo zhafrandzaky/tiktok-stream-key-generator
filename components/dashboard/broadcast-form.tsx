@@ -85,9 +85,9 @@ export function BroadcastForm({
         </div>
 
         <div className="space-y-2">
-          <Label>Category</Label>
+          <Label htmlFor="live-category">Category</Label>
           <Select value={category} onValueChange={setCategory}>
-            <SelectTrigger className="focus-glass w-full rounded-xl">
+            <SelectTrigger id="live-category" className="focus-glass w-full rounded-xl">
               <SelectValue placeholder="Select a category" />
             </SelectTrigger>
             <SelectContent className="glass-strong rounded-xl">

@@ -1,6 +1,6 @@
 import type { ChatEvent, LiveRoomResult, LiveStatus, SessionState } from "@/lib/types"
 import type { AuthController, AuthQr, AuthStatus, ChatController, EngineHandle, LiveController } from "./engine"
-import { AuthRequiredError } from "./errors"
+import { AlreadyAuthenticatedError, AuthRequiredError } from "./errors"
 import { createEventBus } from "./events"
 
 export type FakeEngineOptions = {
@@ -54,6 +54,7 @@ export function createFakeEngine(options: FakeEngineOptions = {}): EngineHandle 
 
   const auth: AuthController = {
     async start(): Promise<AuthQr> {
+      if (session.status === "authenticated") throw new AlreadyAuthenticatedError()
       stopLoginTimer()
       qr = { qrDataUrl: QR_PNG, expiresAt: Date.now() + 120_000, version: 1 }
       loginTimer = setTimeout(() => {
@@ -151,6 +152,10 @@ export function createFakeEngine(options: FakeEngineOptions = {}): EngineHandle 
     auth,
     live,
     chat,
+    async dispose(): Promise<void> {
+      stopLoginTimer()
+      stopChatTimers()
+    },
     async getStatus() {
       return {
         ok: true,

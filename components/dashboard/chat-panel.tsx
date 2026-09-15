@@ -117,6 +117,7 @@ export function ChatPanel() {
         <Input
           value={username}
           placeholder="@username to read chat from"
+          aria-label="TikTok username"
           className="focus-glass rounded-xl"
           onChange={(event) => setUsername(event.target.value)}
           onKeyDown={(event) => {

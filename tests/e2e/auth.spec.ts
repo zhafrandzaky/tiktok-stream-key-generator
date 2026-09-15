@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test"
+import { expect, test } from "./fixtures"
 import { ensureSignedIn } from "./helpers"
 
 test("signs in through the QR flow", async ({ page }) => {

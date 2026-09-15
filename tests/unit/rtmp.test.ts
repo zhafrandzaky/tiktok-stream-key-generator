@@ -111,6 +111,31 @@ describe("extractRtmp", () => {
     )
   })
 
+  it("splits a push url that already contains the key when a key is also provided", () => {
+    expect(
+      extractRtmp(JSON.stringify({ push_url: "rtmp://host/app?key=abc123", stream_key: "abc123" })),
+    ).toEqual({
+      rtmpUrl: "rtmp://host/app",
+      streamKey: "abc123",
+      combinedPushUrl: "rtmp://host/app/abc123",
+    })
+    expect(
+      extractRtmp(
+        JSON.stringify({ push_url: "rtmp://host/app/stream-key-abc", stream_key: "stream-key-abc" }),
+      ),
+    ).toEqual({
+      rtmpUrl: "rtmp://host/app",
+      streamKey: "stream-key-abc",
+      combinedPushUrl: "rtmp://host/app/stream-key-abc",
+    })
+  })
+
+  it("tolerates malformed percent escapes in query keys", () => {
+    expect(() => extractRtmp(JSON.stringify({ push_url: "rtmp://host/app?key=%E0%A4%A" }))).toThrow(
+      RtmpParseError,
+    )
+  })
+
   it("ignores empty stream keys", () => {
     expect(() =>
       extractRtmp(JSON.stringify({ stream_url: "rtmp://cdn/app", stream_key: "   " })),
