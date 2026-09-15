@@ -5,7 +5,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 
 export default function Home() {
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col p-4 sm:p-6 lg:p-8">
+    <main className="mx-auto flex w-full max-w-[1680px] flex-1 flex-col p-4 sm:p-6 lg:p-8">
       <header className="mb-6 flex items-center justify-between gap-4">
         <div>
           <h1 className="text-lg font-semibold tracking-tight">TikTok Live Studio Kit</h1>
@@ -16,13 +16,13 @@ export default function Home() {
         <ThemeToggle />
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
+      <div className="grid flex-1 gap-6 lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)]">
         <section className="space-y-6">
           <AuthCard />
+          <LiveStudio />
         </section>
 
-        <section className="space-y-6">
-          <LiveStudio />
+        <section className="min-w-0">
           <ChatPanel />
         </section>
       </div>
