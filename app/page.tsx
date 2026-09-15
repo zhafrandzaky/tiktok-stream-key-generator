@@ -27,7 +27,7 @@ export default function Home() {
         </section>
       </div>
 
-      <footer className="mt-10 text-xs text-muted-foreground">
+      <footer className="mt-10 text-center text-xs text-muted-foreground">
         Unofficial automation — may violate TikTok&apos;s terms of service. Use at your own risk.
       </footer>
     </main>
