@@ -62,13 +62,13 @@ function AutoScrollList({
   useEffect(() => {
     const element = ref.current
     if (!element || !pinned.current) return
-    element.scrollTop = element.scrollHeight
+    element.scrollTop = 0
   }, [dependency])
 
   const onScroll = () => {
     const element = ref.current
     if (!element) return
-    pinned.current = element.scrollHeight - element.scrollTop - element.clientHeight < 40
+    pinned.current = element.scrollTop < 40
   }
 
   return (
@@ -130,6 +130,10 @@ export function ChatPanel() {
       }),
     [events, enabled],
   )
+
+  const chatList = useMemo(() => [...chatEvents].reverse(), [chatEvents])
+
+  const eventList = useMemo(() => [...eventEvents].reverse(), [eventEvents])
   const connect = async () => {
     const value = username.trim().replace(/^@/, "")
     if (!value) {
@@ -162,7 +166,7 @@ export function ChatPanel() {
   }
 
   return (
-    <GlassPanel className="p-6 lg:flex lg:h-full lg:flex-col">
+    <GlassPanel className="p-6">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <MessagesSquare className="size-4 text-muted-foreground" />
@@ -212,14 +216,11 @@ export function ChatPanel() {
         )}
       </div>
 
-      <div className="mt-4 grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
-        <section className="min-w-0 lg:flex lg:min-h-0 lg:flex-col">
+      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
+        <section className="min-w-0">
           <h3 className="mb-2 text-xs font-medium text-muted-foreground">Chat</h3>
-          <AutoScrollList
-            dependency={chatEvents}
-            className="h-[380px] space-y-2 lg:h-auto lg:min-h-0 lg:flex-1"
-          >
-            {chatEvents.length === 0 ? (
+          <AutoScrollList dependency={chatList} className="h-[440px] space-y-2">
+            {chatList.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
                 <MessagesSquare className="size-6 text-muted-foreground/60" />
                 <p className="text-sm text-muted-foreground">
@@ -227,12 +228,12 @@ export function ChatPanel() {
                 </p>
               </div>
             ) : (
-              chatEvents.map((event) => <EventRow key={eventKey(event)} event={event} />)
+              chatList.map((event) => <EventRow key={eventKey(event)} event={event} />)
             )}
           </AutoScrollList>
         </section>
 
-        <section className="min-w-0 lg:flex lg:min-h-0 lg:flex-col">
+        <section className="min-w-0">
           <div className="mb-2 flex items-center justify-between gap-2">
             <h3 className="text-xs font-medium text-muted-foreground">Events</h3>
             <span className="text-[11px] tabular-nums text-muted-foreground/70">
@@ -259,11 +260,8 @@ export function ChatPanel() {
               </button>
             ))}
           </div>
-          <AutoScrollList
-            dependency={eventEvents}
-            className="h-[326px] space-y-2 lg:h-auto lg:min-h-0 lg:flex-1"
-          >
-            {eventEvents.length === 0 ? (
+          <AutoScrollList dependency={eventList} className="h-[412px] space-y-2">
+            {eventList.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
                 <Gift className="size-6 text-muted-foreground/60" />
                 <p className="text-sm text-muted-foreground">
@@ -271,7 +269,7 @@ export function ChatPanel() {
                 </p>
               </div>
             ) : (
-              eventEvents.map((event) => <EventRow key={eventKey(event)} event={event} />)
+              eventList.map((event) => <EventRow key={eventKey(event)} event={event} />)
             )}
           </AutoScrollList>
         </section>
