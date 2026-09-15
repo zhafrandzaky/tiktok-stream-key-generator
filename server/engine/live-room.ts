@@ -33,10 +33,10 @@ export const LIVE_SELECTORS = {
   goLive: [
     'button:has-text("Go LIVE")',
     'a:has-text("Go LIVE")',
+    '[role="button"]:has-text("Go LIVE")',
     '[role="link"]:has-text("Go LIVE")',
-    'text="Go LIVE"',
     'button:has-text("Go Live")',
-    'button:has-text("Start LIVE")',
+    'a:has-text("Go Live")',
     '[data-e2e*="go-live" i]',
   ],
   endLive: [
@@ -124,6 +124,23 @@ export function createLiveRoom(deps: {
     return null
   }
 
+  const waitForVisible = async (page: Page, selectors: string[], timeout: number) => {
+    const locator = page.locator(selectors.join(", ")).first()
+    const found = await locator
+      .waitFor({ state: "visible", timeout })
+      .then(() => true)
+      .catch(() => false)
+    return found ? locator : null
+  }
+
+  const waitForBody = async (page: Page, timeout: number) => {
+    await page
+      .waitForFunction(() => (document.body?.innerText ?? "").trim().length > 0, undefined, {
+        timeout,
+      })
+      .catch(() => undefined)
+  }
+
   const extractFromDom = async (page: Page): Promise<LiveRoomResult | null> => {
     const inputs = await page
       .locator("input, textarea")
@@ -177,6 +194,8 @@ export function createLiveRoom(deps: {
         throw new AuthRequiredError("The TikTok session expired. Sign in again.")
       }
 
+      await waitForBody(page, 25_000)
+
       const bodyText = (await page.textContent("body").catch(() => "")) ?? ""
       if (NOT_ELIGIBLE_PATTERNS.some((pattern) => pattern.test(bodyText))) {
         throw new NotEligibleError()
@@ -196,51 +215,56 @@ export function createLiveRoom(deps: {
       page.on("response", onResponse)
 
       const applied: string[] = []
-      const titleField = await findVisible(page, LIVE_SELECTORS.title)
-      if (titleField && input.title) {
-        await titleField.fill(input.title).catch(() => undefined)
-        applied.push("title")
-      }
-
-      if (input.category) {
-        const categoryTrigger = await findVisible(page, LIVE_SELECTORS.category)
-        if (categoryTrigger) {
-          await categoryTrigger.click().catch(() => undefined)
-          const option = page.getByRole("option", { name: input.category }).first()
-          const optionVisible = await option
-            .isVisible({ timeout: 1000 })
-            .then((visible) => visible)
-            .catch(() => false)
-          if (optionVisible) {
-            await option.click().catch(() => undefined)
-            applied.push("category")
-          } else {
-            await page.keyboard.press("Escape").catch(() => undefined)
-          }
-        }
-      }
-
-      if (input.ageRestricted) {
-        const toggle = await findVisible(page, LIVE_SELECTORS.ageRestricted)
-        if (toggle) {
-          const isOn = await readToggleState(toggle)
-          if (isOn !== true) await toggle.click().catch(() => undefined)
-          applied.push("ageRestricted")
-        }
-      }
 
       try {
-        const goLive = await findVisible(page, LIVE_SELECTORS.goLive)
-        if (!goLive) {
+        const entry = await waitForVisible(page, LIVE_SELECTORS.goLive, 25_000)
+        if (!entry) {
           const path = await artifact(page, payloads)
           throw new ExtractionFailedError(
             `Could not find the Go LIVE control. Debug artifact: ${path}`,
           )
         }
-        await goLive.click().catch(() => undefined)
+        await entry.click().catch(() => undefined)
+
+        await page.waitForTimeout(2500)
+        await waitForBody(page, 15_000)
+
+        const titleField = await findVisible(page, LIVE_SELECTORS.title)
+        if (titleField && input.title) {
+          await titleField.fill(input.title).catch(() => undefined)
+          applied.push("title")
+        }
+
+        if (input.category) {
+          const categoryTrigger = await findVisible(page, LIVE_SELECTORS.category)
+          if (categoryTrigger) {
+            await categoryTrigger.click().catch(() => undefined)
+            const option = page.getByRole("option", { name: input.category }).first()
+            const optionVisible = await option
+              .isVisible({ timeout: 1000 })
+              .then((visible) => visible)
+              .catch(() => false)
+            if (optionVisible) {
+              await option.click().catch(() => undefined)
+              applied.push("category")
+            } else {
+              await page.keyboard.press("Escape").catch(() => undefined)
+            }
+          }
+        }
+
+        if (input.ageRestricted) {
+          const toggle = await findVisible(page, LIVE_SELECTORS.ageRestricted)
+          if (toggle) {
+            const isOn = await readToggleState(toggle)
+            if (isOn !== true) await toggle.click().catch(() => undefined)
+            applied.push("ageRestricted")
+          }
+        }
 
         const deadline = Date.now() + createTimeoutMs
         let parsedCount = 0
+        let confirmed = false
         while (Date.now() < deadline) {
           while (parsedCount < payloads.length) {
             const payload = payloads[parsedCount]
@@ -254,6 +278,20 @@ export function createLiveRoom(deps: {
               if (!(error instanceof RtmpParseError)) throw error
             }
           }
+
+          if (!confirmed && Date.now() > deadline - createTimeoutMs + 12_000) {
+            confirmed = true
+            const confirmButton = page.locator(LIVE_SELECTORS.goLive.join(", ")).last()
+            const confirmVisible = await confirmButton
+              .isVisible({ timeout: 500 })
+              .then((visible) => visible)
+              .catch(() => false)
+            if (confirmVisible) {
+              await confirmButton.click().catch(() => undefined)
+              applied.push("confirm")
+            }
+          }
+
           await page.waitForTimeout(500)
         }
 

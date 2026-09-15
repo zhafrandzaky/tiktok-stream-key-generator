@@ -234,6 +234,11 @@ Route handlers are thin: validate input, call engine, map typed errors to HTTP c
 3. Attach `page.on('response')` interceptors matching JSON bodies containing keys
    `push_url | stream_url | rtmp | stream_key | rtmp_push_url` (case-insensitive scan,
    bounded depth). Also attach a DOM fallback that reads stream-key input fields.
+   TikTok Studio (`/tiktokstudio/live`) is a slow SPA: the engine waits for the body to
+   render and for the *Go LIVE* control to become visible (up to 25s) before acting — an
+   immediate lookup finds a blank page (observed ~6–10s render time). If credentials do not
+   arrive within ~12s of opening the setup, the engine clicks the last visible Go LIVE
+   control once as the confirmation step.
 4. Fill title / category / age restriction when the controls exist; ignore absent controls
    and report which options were applied in the response (`applied: string[]`).
 5. Submit; wait for the intercepted payload (timeout 45s).
