@@ -1,4 +1,5 @@
 import { AuthCard } from "@/components/dashboard/auth-card"
+import { LiveStudio } from "@/components/dashboard/live-studio"
 import { GlassPanel } from "@/components/glass-panel"
 import { ThemeToggle } from "@/components/theme-toggle"
 
@@ -21,12 +22,7 @@ export default function Home() {
         </section>
 
         <section className="space-y-6">
-          <GlassPanel className="p-6">
-            <h2 className="text-sm font-semibold tracking-tight">Stream credentials</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Sign in and create a live room to get your RTMP server URL and stream key.
-            </p>
-          </GlassPanel>
+          <LiveStudio />
 
           <GlassPanel className="p-6">
             <h2 className="text-sm font-semibold tracking-tight">Live chat &amp; events</h2>
