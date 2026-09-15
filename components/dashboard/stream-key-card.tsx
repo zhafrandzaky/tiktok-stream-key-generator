@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Eye, EyeOff, Loader2, PhoneOff } from "lucide-react"
+import { useReducedMotion } from "motion/react"
 import { toast } from "sonner"
 import { CopyButton } from "@/components/copy-button"
 import { GlassPanel } from "@/components/glass-panel"
@@ -39,6 +40,7 @@ export function StreamKeyCard({
   const [hideIn, setHideIn] = useState(0)
   const [busy, setBusy] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const reduceMotion = useReducedMotion()
 
   useEffect(() => {
     if (!revealed) return
@@ -78,7 +80,7 @@ export function StreamKeyCard({
 
   return (
     <GlassPanel className="relative overflow-hidden p-6">
-      {room ? (
+      {room && !reduceMotion ? (
         <BorderBeam
           size={120}
           duration={9}

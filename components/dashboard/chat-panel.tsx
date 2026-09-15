@@ -158,9 +158,12 @@ export function ChatPanel() {
             className="mt-3 h-[360px] space-y-2 overflow-y-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             {chatEvents.length === 0 ? (
-              <p className="pt-6 text-center text-sm text-muted-foreground">
-                No messages yet — connect a live room to start reading chat.
-              </p>
+              <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+                <MessagesSquare className="size-6 text-muted-foreground/60" />
+                <p className="text-sm text-muted-foreground">
+                  No messages yet — connect a live room to start reading chat.
+                </p>
+              </div>
             ) : (
               chatEvents.map((event) => <EventRow key={eventKey(event)} event={event} />)
             )}
