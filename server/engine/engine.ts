@@ -1,7 +1,7 @@
 import type { ChatEvent, LiveRoomResult, LiveStatus, SessionState } from "@/lib/types"
 import { createAuthManager } from "./auth-manager"
 import { createBrowserManager } from "./browser"
-import { EngineError } from "./errors"
+import { createChatConnection } from "./chat-connection"
 import { createEventBus } from "./events"
 import { createLiveRoom } from "./live-room"
 import { createSessionStore, type SessionStore } from "./session-store"
@@ -56,12 +56,6 @@ export type EngineDeps = {
   headless?: boolean
 }
 
-function notImplemented(name: string): () => Promise<never> {
-  return async () => {
-    throw new EngineError(`${name} is not available`, "NOT_IMPLEMENTED")
-  }
-}
-
 export function createEngine(deps: EngineDeps): EngineHandle {
   const bus = createEventBus()
   const store: SessionStore = createSessionStore(deps.dataDir)
@@ -77,12 +71,7 @@ export function createEngine(deps: EngineDeps): EngineHandle {
     dataDir: deps.dataDir,
   })
 
-  const chat: ChatController = {
-    connect: notImplemented("chat.connect") as ChatController["connect"],
-    disconnect: async () => {},
-    subscribe: bus.subscribe,
-    snapshot: bus.snapshot,
-  }
+  const chat: ChatController = createChatConnection({ bus })
 
   return {
     auth,
