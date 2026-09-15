@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Loader2, MessagesSquare, PlugZap, Unplug } from "lucide-react"
+import { Gift, Loader2, MessagesSquare, PlugZap, Unplug } from "lucide-react"
 import { toast } from "sonner"
 import { EventRow } from "@/components/dashboard/event-row"
 import { GlassPanel } from "@/components/glass-panel"
@@ -10,19 +10,92 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { NumberTicker } from "@/components/ui/number-ticker"
 import { Separator } from "@/components/ui/separator"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useChatSocket } from "@/hooks/use-chat-socket"
 import { apiGet, apiPost } from "@/lib/api-client"
 import { eventKey } from "@/lib/event-key"
-import type { SessionState } from "@/lib/types"
+import type { ChatEvent, SessionState } from "@/lib/types"
+import { cn } from "@/lib/utils"
+
+type EventCategory = "gift" | "follow" | "share" | "like" | "member" | "system"
+
+const EVENT_FILTERS: Array<{ id: EventCategory; label: string; defaultOn: boolean }> = [
+  { id: "gift", label: "Gifts", defaultOn: true },
+  { id: "follow", label: "Follows", defaultOn: true },
+  { id: "share", label: "Shares", defaultOn: true },
+  { id: "like", label: "Likes", defaultOn: true },
+  { id: "member", label: "Joins", defaultOn: false },
+  { id: "system", label: "System", defaultOn: true },
+]
+
+function categoryOf(event: ChatEvent): EventCategory | null {
+  switch (event.type) {
+    case "gift":
+      return "gift"
+    case "follow":
+      return "follow"
+    case "share":
+      return "share"
+    case "like":
+      return "like"
+    case "member":
+      return "member"
+    case "status":
+    case "streamEnd":
+      return "system"
+    default:
+      return null
+  }
+}
+
+function AutoScrollList({
+  dependency,
+  className,
+  children,
+}: {
+  dependency: unknown
+  className?: string
+  children: React.ReactNode
+}) {
+  const ref = useRef<HTMLDivElement | null>(null)
+  const pinned = useRef(true)
+
+  useEffect(() => {
+    const element = ref.current
+    if (!element || !pinned.current) return
+    element.scrollTop = element.scrollHeight
+  }, [dependency])
+
+  const onScroll = () => {
+    const element = ref.current
+    if (!element) return
+    pinned.current = element.scrollHeight - element.scrollTop - element.clientHeight < 40
+  }
+
+  return (
+    <div
+      ref={ref}
+      onScroll={onScroll}
+      className={cn(
+        "overflow-y-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  )
+}
 
 export function ChatPanel() {
-  const { events, connected } = useChatSocket({ maxEvents: 150 })
+  const { events, connected } = useChatSocket({ maxEvents: 200 })
   const [username, setUsername] = useState("")
   const [busy, setBusy] = useState(false)
   const [activeRoom, setActiveRoom] = useState<string | null>(null)
-  const scrollRef = useRef<HTMLDivElement | null>(null)
-  const pinnedRef = useRef(true)
+  const [enabled, setEnabled] = useState<Record<EventCategory, boolean>>(() =>
+    Object.fromEntries(EVENT_FILTERS.map((filter) => [filter.id, filter.defaultOn])) as Record<
+      EventCategory,
+      boolean
+    >,
+  )
 
   useEffect(() => {
     const id = setTimeout(() => {
@@ -45,21 +118,18 @@ export function ChatPanel() {
     return undefined
   }, [events])
 
-  const chatEvents = events.filter((event) => event.type === "chat")
-  const otherEvents = events.filter((event) => event.type !== "chat" && event.type !== "viewerCount")
+  const chatEvents = useMemo(() => events.filter((event) => event.type === "chat"), [events])
 
-  useEffect(() => {
-    const element = scrollRef.current
-    if (!element || !pinnedRef.current) return
-    element.scrollTop = element.scrollHeight
-  }, [events])
-
-  const onScroll = () => {
-    const element = scrollRef.current
-    if (!element) return
-    pinnedRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 40
-  }
-
+  const eventEvents = useMemo(
+    () =>
+      events.filter((event) => {
+        const category = categoryOf(event)
+        if (!category || !enabled[category]) return false
+        if (event.type === "gift" && !event.streakEnd) return false
+        return true
+      }),
+    [events, enabled],
+  )
   const connect = async () => {
     const value = username.trim().replace(/^@/, "")
     if (!value) {
@@ -142,22 +212,10 @@ export function ChatPanel() {
         )}
       </div>
 
-      <Tabs defaultValue="chat" className="mt-4">
-        <TabsList className="glass rounded-xl">
-          <TabsTrigger value="chat" className="rounded-lg">
-            Chat
-          </TabsTrigger>
-          <TabsTrigger value="events" className="rounded-lg">
-            Events
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="chat">
-          <div
-            ref={scrollRef}
-            onScroll={onScroll}
-            className="mt-3 h-[360px] space-y-2 overflow-y-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          >
+      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)]">
+        <section className="min-w-0">
+          <h3 className="mb-2 text-xs font-medium text-muted-foreground">Chat</h3>
+          <AutoScrollList dependency={chatEvents} className="h-[380px] space-y-2">
             {chatEvents.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
                 <MessagesSquare className="size-6 text-muted-foreground/60" />
@@ -168,21 +226,50 @@ export function ChatPanel() {
             ) : (
               chatEvents.map((event) => <EventRow key={eventKey(event)} event={event} />)
             )}
-          </div>
-        </TabsContent>
+          </AutoScrollList>
+        </section>
 
-        <TabsContent value="events">
-          <div className="mt-3 h-[360px] space-y-2 overflow-y-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {otherEvents.length === 0 ? (
-              <p className="pt-6 text-center text-sm text-muted-foreground">
-                Gifts, follows, shares and system events appear here.
-              </p>
-            ) : (
-              otherEvents.map((event) => <EventRow key={eventKey(event)} event={event} />)
-            )}
+        <section className="min-w-0">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h3 className="text-xs font-medium text-muted-foreground">Events</h3>
+            <span className="text-[11px] tabular-nums text-muted-foreground/70">
+              {eventEvents.length}
+            </span>
           </div>
-        </TabsContent>
-      </Tabs>
+          <div className="mb-2 flex flex-wrap gap-1">
+            {EVENT_FILTERS.map((filter) => (
+              <button
+                key={filter.id}
+                type="button"
+                aria-pressed={enabled[filter.id]}
+                className={cn(
+                  "focus-glass rounded-lg border px-2 py-1 text-[11px] transition-colors",
+                  enabled[filter.id]
+                    ? "border-white/20 bg-secondary text-secondary-foreground"
+                    : "border-transparent text-muted-foreground hover:bg-secondary/50",
+                )}
+                onClick={() =>
+                  setEnabled((prev) => ({ ...prev, [filter.id]: !prev[filter.id] }))
+                }
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+          <AutoScrollList dependency={eventEvents} className="h-[326px] space-y-2">
+            {eventEvents.length === 0 ? (
+              <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+                <Gift className="size-6 text-muted-foreground/60" />
+                <p className="text-sm text-muted-foreground">
+                  Gifts, follows, likes and system events appear here.
+                </p>
+              </div>
+            ) : (
+              eventEvents.map((event) => <EventRow key={eventKey(event)} event={event} />)
+            )}
+          </AutoScrollList>
+        </section>
+      </div>
     </GlassPanel>
   )
 }

@@ -32,7 +32,9 @@ made for OBS Browser Sources.
   *Create live room*, and the app intercepts TikTok's own response to return the RTMP server
   URL and stream key. Sessions persist under `.data/` so you do not log in every time.
 - **Real-time chat & events.** Comments, gifts (streak-aware), follows, shares, likes, member
-  joins, viewer counts and stream-end events stream over WebSocket.
+  joins, viewer counts and stream-end events stream over WebSocket. The dashboard shows chat
+  on the left and events on the right, with per-category event toggles (Gifts, Follows, Shares,
+  Likes, Joins, System).
 - **OBS overlay.** `/overlay/chat` renders transparent, high-contrast rows ready for a Browser
   Source or Custom Browser Dock.
 - **Apple-style liquid glass UI.** Layered translucency, hairline borders and restrained

@@ -289,6 +289,26 @@ Query params: `username` (optional; follows the dashboard's active connection wh
 - Text contrast: near-white text with soft shadow on dark, near-black on light, plus a thin
   translucent chip behind each row (configurable `chip=0|1`).
 
+### 5.6 Chat payload mapping (verified against live streams)
+
+`tiktok-live-connector` 2.4.4 emits payloads whose decoded field names differ from the
+protobuf typings, so `lib/parsers/chat.ts` reads the live shapes with fallbacks:
+
+| Event | Live field | Fallback kept |
+|---|---|---|
+| chat | `content` | `comment` |
+| user handle | `displayId` | `idStr`, `userId`, `id` (there is **no** `uniqueId`) |
+| user avatar | `avatarThumb.urlList[0]` | `avatarMedium/Large`, `profilePictureUrl` |
+| like | `count`, `total` (string) | `likeCount`, `totalLikeCount` |
+| room users | `totalUser` (string) | `viewerCount`, `total` |
+| gift streak | `repeatEnd` numeric 0/1 | boolean/string forms |
+| social | `followCount` / `shareCount` | `action` text |
+
+Without these fallbacks, user-bearing events (chat/gift/member/follow) were dropped while
+likes and control events still rendered — the exact symptom reported during testing. The chat
+panel UI is a two-column layout (chat left without tabs, events right with per-category
+toggles); gift rows are rendered only when a streak ends to avoid duplicate entries.
+
 ## 6. UI Design — Apple Liquid Glass
 
 ### 6.1 Principles

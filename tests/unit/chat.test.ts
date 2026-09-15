@@ -171,3 +171,81 @@ describe("normalizeWebcastEvent", () => {
     expect(normalizeWebcastEvent("error", {}, at)).toEqual({ type: "status", state: "error", at })
   })
 })
+
+describe("normalizeWebcastEvent with real tiktok payload shapes", () => {
+  const realUser = {
+    id: "7605171734949528584",
+    nickname: "YINGSAN_^~^",
+    displayId: "yingsan_tt",
+    avatarThumb: { urlList: ["https://p16.example/avt.webp"] },
+  }
+
+  it("reads chat text from `content` and the handle from displayId", () => {
+    expect(normalizeWebcastEvent("chat", { user: realUser, content: "Mano ni" }, at)).toEqual({
+      type: "chat",
+      user: {
+        uniqueId: "yingsan_tt",
+        nickname: "YINGSAN_^~^",
+        avatarUrl: "https://p16.example/avt.webp",
+      },
+      comment: "Mano ni",
+      at,
+    })
+  })
+
+  it("falls back to idStr or numeric id when displayId is absent", () => {
+    const withoutDisplayId = {
+      id: realUser.id,
+      nickname: realUser.nickname,
+      avatarThumb: realUser.avatarThumb,
+    }
+    expect(normalizeWebcastEvent("chat", { user: withoutDisplayId, content: "hi" }, at)).toMatchObject({
+      user: { uniqueId: "7605171734949528584" },
+    })
+    expect(
+      normalizeWebcastEvent("chat", { user: { id: "42", idStr: "42" }, content: "hi" }, at),
+    ).toMatchObject({ user: { uniqueId: "42" } })
+  })
+
+  it("normalizes likes from count/total", () => {
+    expect(
+      normalizeWebcastEvent("like", { user: realUser, count: 12, total: "123502" }, at),
+    ).toMatchObject({ type: "like", count: 12, total: 123502 })
+  })
+
+  it("normalizes viewer counts from totalUser", () => {
+    expect(normalizeWebcastEvent("roomUser", { totalUser: "264774", ranks: [] }, at)).toEqual({
+      type: "viewerCount",
+      count: 264774,
+      at,
+    })
+  })
+
+  it("treats numeric repeatEnd values correctly for gift streaks", () => {
+    const gift = (repeatEnd: number) => ({
+      user: realUser,
+      giftId: 5655,
+      repeatCount: 3,
+      repeatEnd,
+      giftDetails: { giftName: "Rose", diamondCount: 2 },
+    })
+    expect(normalizeWebcastEvent("gift", gift(0), at)).toMatchObject({ streakEnd: false, diamonds: 6 })
+    expect(normalizeWebcastEvent("gift", gift(1), at)).toMatchObject({ streakEnd: true })
+  })
+
+  it("classifies social events by followCount/shareCount", () => {
+    expect(
+      normalizeWebcastEvent("social", { user: realUser, followCount: "1", shareCount: "0" }, at),
+    ).toMatchObject({ type: "follow" })
+    expect(
+      normalizeWebcastEvent("social", { user: realUser, followCount: "0", shareCount: "1" }, at),
+    ).toMatchObject({ type: "share" })
+    expect(normalizeWebcastEvent("social", { user: realUser, followCount: "0" }, at)).toBeNull()
+  })
+
+  it("normalizes member joins from real payloads", () => {
+    expect(
+      normalizeWebcastEvent("member", { user: realUser, memberCount: 264774, action: 1 }, at),
+    ).toMatchObject({ type: "member", viewerCount: 264774 })
+  })
+})
