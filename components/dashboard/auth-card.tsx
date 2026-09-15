@@ -12,7 +12,13 @@ import { ApiError, apiGet, apiPost } from "@/lib/api-client"
 import type { SessionState } from "@/lib/types"
 
 type QrPayload = { qrDataUrl: string; expiresAt: number; version: number }
-type AuthStatusPayload = SessionState & { qr?: QrPayload; detail?: string; mode?: "qr" | "window" }
+type AuthStatusPayload = SessionState & {
+  qr?: QrPayload
+  detail?: string
+  mode?: "qr" | "window"
+  rateLimited?: boolean
+  retryAfter?: number
+}
 
 function formatCountdown(seconds: number): string {
   const clamped = Math.max(0, seconds)
@@ -26,6 +32,8 @@ export function AuthCard() {
   const [qr, setQr] = useState<QrPayload | null>(null)
   const [detail, setDetail] = useState<string | undefined>(undefined)
   const [windowMode, setWindowMode] = useState(false)
+  const [rateLimited, setRateLimited] = useState(false)
+  const [rateLimitMinutes, setRateLimitMinutes] = useState(0)
   const [busy, setBusy] = useState(false)
   const [secondsLeft, setSecondsLeft] = useState(0)
   const authenticatedRef = useRef(false)
@@ -39,6 +47,8 @@ export function AuthCard() {
     setQr(status.qr ?? null)
     setDetail(status.detail)
     setWindowMode(status.status !== "authenticated" && status.mode === "window")
+    setRateLimited(status.status !== "authenticated" && status.rateLimited === true)
+    setRateLimitMinutes(status.retryAfter ? Math.max(1, Math.ceil(status.retryAfter / 60)) : 0)
     if (status.qr) {
       setSecondsLeft(Math.max(0, Math.round((status.qr.expiresAt - Date.now()) / 1000)))
     }
@@ -202,8 +212,8 @@ export function AuthCard() {
           <div>
             <p className="text-sm font-medium">Waiting for login in the browser window…</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Finish signing in there (QR or password). This page detects it automatically and stores
-              the session.
+              Log in there with your email and password — QR login stays paused while TikTok
+              rate-limits it. This page detects the session automatically.
             </p>
           </div>
           {detail ? <p className="text-xs text-amber-600 dark:text-amber-400">{detail}</p> : null}
@@ -244,7 +254,22 @@ export function AuthCard() {
             </p>
           </div>
           {detail ? <p className="text-center text-xs text-amber-600 dark:text-amber-400">{detail}</p> : null}
+          {rateLimited ? (
+            <p className="text-center text-xs text-muted-foreground">
+              TikTok paused QR login for this network
+              {rateLimitMinutes ? ` (~${rateLimitMinutes} min)` : ""}. The login window works right away.
+            </p>
+          ) : null}
           <div className="flex justify-center gap-2">
+            <Button
+              variant={rateLimited ? "default" : "ghost"}
+              size="sm"
+              className="focus-glass rounded-xl"
+              disabled={busy}
+              onClick={() => startLogin("window")}
+            >
+              Open login window
+            </Button>
             <Button
               variant="ghost"
               size="sm"
@@ -254,15 +279,6 @@ export function AuthCard() {
             >
               {busy ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
               Refresh code
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="focus-glass rounded-xl"
-              disabled={busy}
-              onClick={() => startLogin("window")}
-            >
-              Open login window
             </Button>
           </div>
         </div>
@@ -276,18 +292,30 @@ export function AuthCard() {
             </p>
           </div>
           {detail ? <p className="text-xs text-amber-600 dark:text-amber-400">{detail}</p> : null}
+          {rateLimited ? (
+            <p className="text-xs text-muted-foreground">
+              TikTok paused QR login for this network
+              {rateLimitMinutes ? ` (~${rateLimitMinutes} min)` : ""}. Sign in with email and
+              password in the login window instead.
+            </p>
+          ) : null}
           <div className="flex flex-wrap justify-center gap-2">
-            <Button className="focus-glass rounded-xl" disabled={busy} onClick={() => startLogin("qr")}>
-              {busy ? <Loader2 className="size-4 animate-spin" /> : <QrCode className="size-4" />}
-              Sign in with TikTok
-            </Button>
             <Button
-              variant="secondary"
+              variant={rateLimited ? "default" : "secondary"}
               className="focus-glass rounded-xl"
               disabled={busy}
               onClick={() => startLogin("window")}
             >
               Open login window
+            </Button>
+            <Button
+              variant={rateLimited ? "ghost" : "default"}
+              className="focus-glass rounded-xl"
+              disabled={busy}
+              onClick={() => startLogin("qr")}
+            >
+              {busy ? <Loader2 className="size-4 animate-spin" /> : <QrCode className="size-4" />}
+              Sign in with TikTok
             </Button>
           </div>
         </div>

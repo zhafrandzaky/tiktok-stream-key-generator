@@ -19,8 +19,10 @@ made for OBS Browser Sources.
   "confirm on your phone" feedback. If TikTok asks for human verification, a headed browser
   window opens so you can solve it.
 - **Browser-window fallback login.** When TikTok rate-limits QR checks (`Maximum number of
-  attempts reached`), the app pauses QR login, says so in the UI, and offers *Open login
-  window*: sign in in the visible browser (QR or password) and the app picks up the session.
+  attempts reached`), the app pauses QR login (persisted backoff: 5 → 15 → 60 minutes, also
+  enforced across restarts) and offers *Open login window*: a visible browser opens directly
+  on TikTok's email/password form — a page that never calls the rate-limited QR endpoint. Sign
+  in there and the app picks up the session automatically.
 - **Stream key extraction.** Fill in the live title, category and age restriction, click
   *Create live room*, and the app intercepts TikTok's own response to return the RTMP server
   URL and stream key. Sessions persist under `.data/` so you do not log in every time.
@@ -125,11 +127,14 @@ QR/login and chat events are scripted. For manual visual checks, start the dev s
 
 - **"TikTok requires human verification"** — solve the check in the browser window that just
   opened; the app keeps polling and continues automatically.
-- **"Maximum number of attempts reached" / QR login paused** — TikTok rate-limits its QR
-  confirmation endpoint per network after many checks. The app stops polling to let the
-  budget recover, shows a countdown, and disables new QR attempts for ~5 minutes. Use
-  *Open login window* instead: log in in the visible browser (password or QR) and the session
-  is captured automatically. Avoid leaving many login attempts running in parallel.
+- **"Maximum number of attempts reached" / QR login paused** — TikTok rate-limits the QR
+  confirmation endpoint per network. The app detects this, stops all QR polling, and refuses
+  new QR attempts for a cooldown that **survives restarts** and escalates on repeated hits
+  (5 → 15 → 60 minutes). Use **Open login window**: it opens TikTok's email/password page
+  (no QR polling at all) and captures the session when you sign in. Leave the app alone during
+  the cooldown — hammering the QR flow keeps the limit alive. If QR still fails hours later,
+  the limit is tied to your network path; try another connection (e.g. phone hotspot) or just
+  keep using the login window.
 - **`ENGINE_UNAVAILABLE` / "Engine is not running"** — start the app with `npm run dev`
   (a plain `next dev` has no engine process).
 - **"The TikTok session expired"** — click *Switch account* and scan a fresh QR code.

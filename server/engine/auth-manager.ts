@@ -5,6 +5,7 @@ import type { SessionState } from "@/lib/types"
 import type { BrowserManager } from "./browser"
 import type { AuthController, AuthQr, AuthStatus, LoginMode } from "./engine"
 import { AlreadyAuthenticatedError, LoginPageFailedError, LoginRateLimitedError } from "./errors"
+import { computeRateLimitHit, createRateLimitStore, type RateLimitStore } from "./rate-limit-store"
 import type { SessionStore } from "./session-store"
 
 export const DEFAULT_LOGIN_URLS = [
@@ -12,7 +13,10 @@ export const DEFAULT_LOGIN_URLS = [
   "https://www.tiktok.com/login?lang=en",
 ]
 
-export const WINDOW_LOGIN_URLS = ["https://www.tiktok.com/login?lang=en"]
+export const WINDOW_LOGIN_URLS = [
+  "https://www.tiktok.com/login/phone-or-email/email",
+  "https://www.tiktok.com/login?lang=en",
+]
 
 export const QR_SELECTORS = [
   'canvas[data-e2e*="qr" i]',
@@ -38,7 +42,6 @@ export const IDENTITY_SELECTORS = {
 
 const QR_TAB_PATTERNS = [/qr code/i, /log in with qr/i]
 const QR_CAPTURE_TIMEOUT_MS = 10_000
-const RATE_LIMIT_COOLDOWN_MS = 5 * 60_000
 const GET_QRCODE_PATH = "/passport/web/get_qrcode/"
 const CHECK_QRCONNECT_PATH = "/passport/web/check_qrconnect/"
 
@@ -82,15 +85,17 @@ function hashQrDataUrl(dataUrl: string): string {
 export function createAuthManager(deps: {
   browsers: BrowserManager
   store: SessionStore
+  rateLimitStore?: RateLimitStore
+  dataDir?: string
   loginUrls?: string[]
   pollMs?: number
   captureTimeoutMs?: number
-  rateLimitCooldownMs?: number
 }): AuthController {
   const loginUrls = deps.loginUrls ?? DEFAULT_LOGIN_URLS
+  const rateLimitStore =
+    deps.rateLimitStore ?? createRateLimitStore(deps.dataDir ?? process.env.DATA_DIR ?? ".data")
   const pollMs = deps.pollMs ?? 1000
   const captureTimeoutMs = deps.captureTimeoutMs ?? QR_CAPTURE_TIMEOUT_MS
-  const rateLimitCooldownMs = deps.rateLimitCooldownMs ?? RATE_LIMIT_COOLDOWN_MS
 
   let session: SessionState = { status: "anonymous" }
   let qr: AuthQr | null = null
@@ -149,13 +154,29 @@ export function createAuthManager(deps: {
 
   const handleRateLimited = async (description?: string) => {
     if (Date.now() < rateLimitedUntil) return
-    rateLimitedUntil = Date.now() + rateLimitCooldownMs
-    const minutes = Math.max(1, Math.ceil(rateLimitCooldownMs / 60_000))
+    const previous = await rateLimitStore.read().catch(() => null)
+    const { state, cooldownMs } = computeRateLimitHit(previous)
+    rateLimitedUntil = state.until
+    await rateLimitStore.write(state).catch(() => undefined)
+    const minutes = Math.max(1, Math.ceil(cooldownMs / 60_000))
     detail = description
-      ? `${description} QR login is paused for ~${minutes} min — or use "Open login window".`
-      : `TikTok rate-limited QR login. It is paused for ~${minutes} min — or use "Open login window".`
+      ? `${description} QR login is paused for ~${minutes} min — or use "Open login window" (email & password).`
+      : `TikTok rate-limited QR login. It is paused for ~${minutes} min — or use "Open login window" (email & password).`
     if (activeMode === "qr") {
       await parkLoginPage()
+    }
+  }
+
+  const clearRateLimit = async () => {
+    if (rateLimitedUntil === 0) return
+    rateLimitedUntil = 0
+    await rateLimitStore.clear().catch(() => undefined)
+  }
+
+  const hydrateRateLimit = async () => {
+    const stored = await rateLimitStore.read().catch(() => null)
+    if (stored && stored.until > Date.now()) {
+      rateLimitedUntil = stored.until
     }
   }
 
@@ -175,17 +196,15 @@ export function createAuthManager(deps: {
       await handleRateLimited(check.description)
       return
     }
+    if (check.state === "error") return
     if (check.state === "scanned") {
       detail = "QR scanned — confirm the login on your phone."
-      return
-    }
-    if (check.state === "expired") {
+    } else if (check.state === "expired") {
       detail = "QR expired — TikTok is refreshing the code."
-      return
-    }
-    if (check.state === "confirmed") {
+    } else if (check.state === "confirmed") {
       detail = "Login confirmed — finishing sign-in…"
     }
+    await clearRateLimit()
   }
 
   const instrumentPage = (page: Page) => {
@@ -266,7 +285,12 @@ export function createAuthManager(deps: {
     return qr ?? (await captureQrFromPage(page))
   }
 
-  const openLoginPage = async (context: BrowserContext, urls: string[] = loginUrls): Promise<Page> => {
+  const openLoginPage = async (
+    context: BrowserContext,
+    urls: string[] = loginUrls,
+    options: { requireQr?: boolean } = {},
+  ): Promise<Page> => {
+    const requireQr = options.requireQr ?? true
     if (parked) {
       loginPage = null
       parked = false
@@ -281,6 +305,8 @@ export function createAuthManager(deps: {
         .then(() => true)
         .catch(() => false)
       if (!loaded) continue
+
+      if (!requireQr) return page
 
       if (await findVisible(page, QR_SELECTORS)) return page
 
@@ -365,6 +391,7 @@ export function createAuthManager(deps: {
   return {
     async start(mode: LoginMode = "qr"): Promise<AuthQr> {
       if (session.status === "authenticated") throw new AlreadyAuthenticatedError()
+      await hydrateRateLimit()
       if (mode === "qr" && Date.now() < rateLimitedUntil) {
         const remainingSeconds = Math.max(1, Math.ceil((rateLimitedUntil - Date.now()) / 1000))
         throw new LoginRateLimitedError(
@@ -384,10 +411,14 @@ export function createAuthManager(deps: {
 
       await deps.store.clear().catch(() => undefined)
       activeMode = mode
-      const page = mode === "window" ? await openLoginPage(context, WINDOW_LOGIN_URLS) : await openLoginPage(context)
+      const page =
+        mode === "window"
+          ? await openLoginPage(context, WINDOW_LOGIN_URLS, { requireQr: false })
+          : await openLoginPage(context)
 
       if (mode === "window") {
-        detail = "Complete the login in the browser window. This page detects it automatically."
+        detail =
+          "Log in with your email and password in the browser window. This page detects it automatically."
         startPolling()
         return qr ?? { qrDataUrl: "", expiresAt: 0, version: 0 }
       }
@@ -409,11 +440,16 @@ export function createAuthManager(deps: {
 
     async status(): Promise<AuthStatus> {
       const current = await resolveStoredSession()
+      await hydrateRateLimit()
+      const rateLimited = Date.now() < rateLimitedUntil
       return {
         ...current,
         ...(qr ? { qr } : {}),
         ...(detail ? { detail } : {}),
         ...(activeMode ? { mode: activeMode } : {}),
+        ...(rateLimited
+          ? { rateLimited: true, retryAfter: Math.max(1, Math.ceil((rateLimitedUntil - Date.now()) / 1000)) }
+          : {}),
       }
     },
 
@@ -427,7 +463,7 @@ export function createAuthManager(deps: {
       loginPage = null
       parked = false
       activeMode = null
-      rateLimitedUntil = 0
+      await hydrateRateLimit()
       await deps.store.clear().catch(() => undefined)
       await deps.browsers.clearCookies()
       await deps.browsers.dispose()

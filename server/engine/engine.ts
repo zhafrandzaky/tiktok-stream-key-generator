@@ -25,6 +25,8 @@ export type AuthStatus = SessionState & {
   qr?: AuthQr
   detail?: string
   mode?: LoginMode
+  rateLimited?: boolean
+  retryAfter?: number
 }
 
 export interface AuthController {
@@ -67,7 +69,7 @@ export function createEngine(deps: EngineDeps): EngineHandle {
     dataDir: deps.dataDir,
     headless: deps.headless ?? true,
   })
-  const auth = createAuthManager({ browsers, store })
+  const auth = createAuthManager({ browsers, store, dataDir: deps.dataDir })
 
   const live: LiveController = createLiveRoom({
     browsers,
