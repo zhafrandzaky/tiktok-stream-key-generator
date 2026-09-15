@@ -1,6 +1,8 @@
 import { createServer } from "node:http"
 import next from "next"
 import { WebSocketServer } from "ws"
+import { createEngine } from "./engine/engine"
+import { createFakeEngine } from "./engine/fake-engine"
 import { setEngine } from "./engine/singleton"
 import { createChatBridge } from "./ws/chat-bridge"
 
@@ -12,9 +14,17 @@ const handle = app.getRequestHandler()
 await app.prepare()
 const upgradeHandler = app.getUpgradeHandler()
 
+const engine =
+  process.env.E2E_MOCK_TIKTOK === "1"
+    ? createFakeEngine()
+    : createEngine({
+        dataDir: process.env.DATA_DIR ?? ".data",
+        headless: process.env.TIKTOK_HEADLESS !== "0",
+      })
+
 const bridge = createChatBridge({
-  getSnapshot: () => [],
-  subscribe: () => () => {},
+  getSnapshot: engine.chat.snapshot,
+  subscribe: engine.chat.subscribe,
 })
 
 const server = createServer((req, res) => {
@@ -50,9 +60,7 @@ wss.on("connection", (ws) => {
   ws.on("error", () => conn.handleClose())
 })
 
-setEngine({
-  getStatus: async () => ({ ok: true, mode: "real", auth: "anonymous", live: false }),
-})
+setEngine(engine)
 
 server.listen(port, () => {
   console.log(`> TikTok Live Studio Kit ready on http://localhost:${port}`)

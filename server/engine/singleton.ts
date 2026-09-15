@@ -1,15 +1,7 @@
 import { EngineUnavailableError } from "./errors"
+import type { EngineHandle } from "./engine"
 
-export type EngineStatus = {
-  ok: boolean
-  mode: "real" | "fake"
-  auth: "anonymous" | "authenticated"
-  live: boolean
-}
-
-export interface EngineHandle {
-  getStatus(): Promise<EngineStatus>
-}
+export type { EngineHandle, EngineStatus } from "./engine"
 
 const KEY = "__tiktokEngine"
 
