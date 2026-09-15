@@ -239,6 +239,10 @@ Route handlers are thin: validate input, call engine, map typed errors to HTTP c
    immediate lookup finds a blank page (observed ~6–10s render time). If credentials do not
    arrive within ~12s of opening the setup, the engine clicks the last visible Go LIVE
    control once as the confirmation step.
+   The *Go LIVE* entry may open a **new tab** (observed: it redirects accounts without web
+   RTMP access to `tiktok.com/studio/download`). The engine therefore instruments every page
+   in the context, follows new tabs, and raises `NotEligibleError` when the download page
+   appears instead of waiting for credentials that will never arrive.
 4. Fill title / category / age restriction when the controls exist; ignore absent controls
    and report which options were applied in the response (`applied: string[]`).
 5. Submit; wait for the intercepted payload (timeout 45s).

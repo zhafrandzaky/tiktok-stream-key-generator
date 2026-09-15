@@ -51,7 +51,12 @@ const NOT_ELIGIBLE_PATTERNS = [
   /not eligible/i,
   /can(?:not|'t) go live/i,
   /live access is not available/i,
+  /download for windows/i,
+  /get live studio/i,
+  /build the ultimate tiktok live experience/i,
 ]
+
+const DOWNLOAD_PAGE_PATTERN = /\/studio\/download/i
 
 const CREATE_TIMEOUT_MS = 45_000
 
@@ -175,31 +180,8 @@ export function createLiveRoom(deps: {
       if (session.status !== "authenticated") throw new AuthRequiredError()
 
       const context = await deps.browsers.getContext()
-      const page = context.pages().at(-1) ?? (await context.newPage())
+      let page = context.pages().at(-1) ?? (await context.newPage())
       pageRef = page
-
-      let navigated = false
-      for (const url of LIVE_URL_CANDIDATES) {
-        const loaded = await page
-          .goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 })
-          .then(() => true)
-          .catch(() => false)
-        if (!loaded) continue
-        if (!page.url().toLowerCase().includes("/login")) {
-          navigated = true
-          break
-        }
-      }
-      if (!navigated) {
-        throw new AuthRequiredError("The TikTok session expired. Sign in again.")
-      }
-
-      await waitForBody(page, 25_000)
-
-      const bodyText = (await page.textContent("body").catch(() => "")) ?? ""
-      if (NOT_ELIGIBLE_PATTERNS.some((pattern) => pattern.test(bodyText))) {
-        throw new NotEligibleError()
-      }
 
       const payloads: string[] = []
       const onResponse = (response: Response) => {
@@ -212,11 +194,49 @@ export function createLiveRoom(deps: {
           })
           .catch(() => undefined)
       }
-      page.on("response", onResponse)
 
-      const applied: string[] = []
+      const instrumented: Page[] = []
+      const instrumentPage = (target: Page) => {
+        if (instrumented.includes(target)) return
+        instrumented.push(target)
+        target.on("response", onResponse)
+      }
+      for (const existing of context.pages()) instrumentPage(existing)
+
+      const followNewPages = (newPage: Page) => {
+        instrumentPage(newPage)
+        page = newPage
+        pageRef = newPage
+        void newPage.waitForLoadState("domcontentloaded").catch(() => undefined)
+      }
+      context.on("page", followNewPages)
 
       try {
+        let navigated = false
+        for (const url of LIVE_URL_CANDIDATES) {
+          const loaded = await page
+            .goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 })
+            .then(() => true)
+            .catch(() => false)
+          if (!loaded) continue
+          if (!page.url().toLowerCase().includes("/login")) {
+            navigated = true
+            break
+          }
+        }
+        if (!navigated) {
+          throw new AuthRequiredError("The TikTok session expired. Sign in again.")
+        }
+
+        await waitForBody(page, 25_000)
+
+        const bodyText = (await page.textContent("body").catch(() => "")) ?? ""
+        if (NOT_ELIGIBLE_PATTERNS.some((pattern) => pattern.test(bodyText))) {
+          throw new NotEligibleError()
+        }
+
+        const applied: string[] = []
+
         const entry = await waitForVisible(page, LIVE_SELECTORS.goLive, 25_000)
         if (!entry) {
           const path = await artifact(page, payloads)
@@ -226,8 +246,21 @@ export function createLiveRoom(deps: {
         }
         await entry.click().catch(() => undefined)
 
-        await page.waitForTimeout(2500)
+        await page.waitForTimeout(3000)
+
+        const newestPage = context.pages().at(-1)
+        if (newestPage && newestPage !== page) {
+          page = newestPage
+          pageRef = newestPage
+        }
         await waitForBody(page, 15_000)
+
+        if (DOWNLOAD_PAGE_PATTERN.test(page.url())) {
+          const path = await artifact(page, payloads)
+          throw new NotEligibleError(
+            `TikTok only offers the LIVE Studio desktop app for this account (no RTMP/OBS access). Debug artifact: ${path}`,
+          )
+        }
 
         const titleField = await findVisible(page, LIVE_SELECTORS.title)
         if (titleField && input.title) {
@@ -279,6 +312,19 @@ export function createLiveRoom(deps: {
             }
           }
 
+          const latestPage = context.pages().at(-1)
+          if (latestPage && latestPage !== page) {
+            page = latestPage
+            pageRef = latestPage
+            await waitForBody(page, 10_000)
+            if (DOWNLOAD_PAGE_PATTERN.test(page.url())) {
+              const path = await artifact(page, payloads)
+              throw new NotEligibleError(
+                `TikTok only offers the LIVE Studio desktop app for this account (no RTMP/OBS access). Debug artifact: ${path}`,
+              )
+            }
+          }
+
           if (!confirmed && Date.now() > deadline - createTimeoutMs + 12_000) {
             confirmed = true
             const confirmButton = page.locator(LIVE_SELECTORS.goLive.join(", ")).last()
@@ -306,7 +352,10 @@ export function createLiveRoom(deps: {
           `TikTok did not return stream credentials in time. Debug artifact: ${path}`,
         )
       } finally {
-        page.off("response", onResponse)
+        for (const instrumentedPage of instrumented) {
+          instrumentedPage.off("response", onResponse)
+        }
+        context.off("page", followNewPages)
       }
     },
 
