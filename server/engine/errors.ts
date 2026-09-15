@@ -44,6 +44,12 @@ export class NotLiveError extends EngineError {
   }
 }
 
+export class LoginPageFailedError extends EngineError {
+  constructor(message = "Could not load the TikTok login page. Check your network connection and try again.") {
+    super(message, "LOGIN_PAGE_FAILED")
+  }
+}
+
 export class ExtractionFailedError extends EngineError {
   constructor(message = "Could not extract the stream key from TikTok.") {
     super(message, "EXTRACTION_FAILED")

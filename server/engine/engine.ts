@@ -1,4 +1,6 @@
 import type { ChatEvent, LiveRoomResult, LiveStatus, SessionState } from "@/lib/types"
+import { createAuthManager } from "./auth-manager"
+import { createBrowserManager } from "./browser"
 import { EngineError } from "./errors"
 import { createEventBus } from "./events"
 import { createSessionStore, type SessionStore } from "./session-store"
@@ -62,20 +64,11 @@ function notImplemented(name: string): () => Promise<never> {
 export function createEngine(deps: EngineDeps): EngineHandle {
   const bus = createEventBus()
   const store: SessionStore = createSessionStore(deps.dataDir)
-
-  const readSession = async (): Promise<SessionState> => {
-    const state = await store.readState()
-    return state ? { status: "authenticated" } : { status: "anonymous" }
-  }
-
-  const auth: AuthController = {
-    start: notImplemented("auth.start") as AuthController["start"],
-    status: async () => readSession(),
-    logout: async () => {
-      await store.clear()
-    },
-    session: readSession,
-  }
+  const browsers = createBrowserManager({
+    dataDir: deps.dataDir,
+    headless: deps.headless ?? true,
+  })
+  const auth = createAuthManager({ browsers, store })
 
   const live: LiveController = {
     create: notImplemented("live.create") as LiveController["create"],
