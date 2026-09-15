@@ -25,12 +25,13 @@ test("creates a live room, masks and copies the stream key, then ends the stream
   await expect(page.getByText("No active room")).toBeVisible({ timeout: 10_000 })
 })
 
-test("shows current and cumulative viewer counters", async ({ page }) => {
+test("shows viewer and like counters", async ({ page }) => {
   await page.goto("/")
   await page.getByPlaceholder("@username to read chat from").fill("@demo")
   await page.getByRole("button", { name: /^connect$/i }).click()
   await expect(page.getByTestId("viewer-count")).toContainText("128", { timeout: 10_000 })
   await expect(page.getByTestId("viewer-total")).toContainText("1,543")
+  await expect(page.getByTestId("like-total")).toContainText("2,345")
 })
 
 test("surfaces a sign-in error when creating a room while unauthenticated", async ({ page }) => {

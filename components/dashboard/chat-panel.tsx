@@ -119,6 +119,10 @@ export function ChatPanel() {
         ? { count: lastViewerEvent.viewerCount, total: undefined }
         : null
 
+  const likeEvent = events.findLast((event) => event.type === "like")
+  const likeTotal = likeEvent?.type === "like" ? likeEvent.total : undefined
+  const hasStats = viewerStats !== null || likeTotal !== undefined
+
   const chatEvents = useMemo(() => events.filter((event) => event.type === "chat"), [events])
 
   const eventEvents = useMemo(
@@ -166,20 +170,30 @@ export function ChatPanel() {
     }
   }
 
-  const viewerBadges = viewerStats ? (
+  const statBadges = (
     <>
-      <Badge data-testid="viewer-count" variant="outline" className="rounded-lg tabular-nums">
-        <NumberTicker value={viewerStats.count} className="text-xs font-semibold" />
-        <span className="ml-1 text-xs text-muted-foreground">viewers</span>
-      </Badge>
-      {viewerStats.total !== undefined ? (
-        <Badge data-testid="viewer-total" variant="outline" className="rounded-lg tabular-nums">
-          <NumberTicker value={viewerStats.total} className="text-xs font-semibold" />
-          <span className="ml-1 text-xs text-muted-foreground">total entered</span>
+      {viewerStats ? (
+        <>
+          <Badge data-testid="viewer-count" variant="outline" className="rounded-lg tabular-nums">
+            <NumberTicker value={viewerStats.count} className="text-xs font-semibold" />
+            <span className="ml-1 text-xs text-muted-foreground">viewers</span>
+          </Badge>
+          {viewerStats.total !== undefined ? (
+            <Badge data-testid="viewer-total" variant="outline" className="rounded-lg tabular-nums">
+              <NumberTicker value={viewerStats.total} className="text-xs font-semibold" />
+              <span className="ml-1 text-xs text-muted-foreground">total entered</span>
+            </Badge>
+          ) : null}
+        </>
+      ) : null}
+      {likeTotal !== undefined ? (
+        <Badge data-testid="like-total" variant="outline" className="rounded-lg tabular-nums">
+          <NumberTicker value={likeTotal} className="text-xs font-semibold" />
+          <span className="ml-1 text-xs text-muted-foreground">total likes</span>
         </Badge>
       ) : null}
     </>
-  ) : null
+  )
 
   return (
     <GlassPanel className="p-6 lg:absolute lg:inset-0 lg:flex lg:flex-col">
@@ -188,9 +202,9 @@ export function ChatPanel() {
           <MessagesSquare className="size-4 text-muted-foreground" />
           <h2 className="text-sm font-semibold tracking-tight">Live chat &amp; events</h2>
         </div>
-        {viewerBadges ? (
+        {hasStats ? (
           <div className="order-2 flex w-full flex-wrap items-center gap-2 lg:order-1 lg:w-auto">
-            {viewerBadges}
+            {statBadges}
           </div>
         ) : null}
         <Badge
