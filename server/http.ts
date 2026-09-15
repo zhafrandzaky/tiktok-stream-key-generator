@@ -15,11 +15,45 @@ const STATUS_BY_CODE: Record<string, number> = {
   BAD_REQUEST: 400,
 }
 
+export type EngineErrorLike = {
+  code: string
+  message: string
+  retryAfter?: number
+}
+
+export function toEngineErrorLike(error: unknown): EngineErrorLike | null {
+  if (error instanceof EngineError) return error
+  if (!(error instanceof Error)) return null
+  const candidate = error as Error & {
+    isEngineError?: unknown
+    code?: unknown
+    retryAfter?: unknown
+  }
+  if (candidate.isEngineError !== true || typeof candidate.code !== "string") return null
+  return {
+    code: candidate.code,
+    message: error.message,
+    ...(typeof candidate.retryAfter === "number" ? { retryAfter: candidate.retryAfter } : {}),
+  }
+}
+
 export function routeError(error: unknown): NextResponse {
-  if (error instanceof EngineError) {
+  const engineError = toEngineErrorLike(error)
+  if (engineError) {
+    const status = STATUS_BY_CODE[engineError.code] ?? 500
+    if (engineError.code === "LOGIN_RATE_LIMITED") {
+      return NextResponse.json(
+        {
+          error: "LOGIN_RATE_LIMITED",
+          message: engineError.message,
+          retryAfter: engineError.retryAfter ?? 300,
+        },
+        { status: 429 },
+      )
+    }
     return NextResponse.json(
-      { error: { code: error.code, message: error.message } },
-      { status: STATUS_BY_CODE[error.code] ?? 500 },
+      { error: { code: engineError.code, message: engineError.message } },
+      { status },
     )
   }
   console.error("[api] unhandled error", error)

@@ -1,5 +1,6 @@
 export class EngineError extends Error {
   readonly code: string
+  readonly isEngineError = true
 
   constructor(message: string, code = "ENGINE_ERROR") {
     super(message)
@@ -51,10 +52,14 @@ export class LoginPageFailedError extends EngineError {
 }
 
 export class LoginRateLimitedError extends EngineError {
+  readonly retryAfter: number
+
   constructor(
     message = "TikTok is rate-limiting QR login attempts from this network. Wait a few minutes, or use \"Open login window\".",
+    retryAfter = 300,
   ) {
     super(message, "LOGIN_RATE_LIMITED")
+    this.retryAfter = retryAfter
   }
 }
 

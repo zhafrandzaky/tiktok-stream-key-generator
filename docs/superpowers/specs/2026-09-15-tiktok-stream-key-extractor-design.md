@@ -188,7 +188,13 @@ Route handlers are thin: validate input, call engine, map typed errors to HTTP c
   `error_code 7 — "Maximum number of attempts reached"`. When detected, the manager:
   parks the login page (`about:blank`) so TikTok's ~2×/s polling stops burning the budget,
   records a rate-limit deadline (~5 min), and reports the state through `status().detail`.
-  `POST /api/auth/login/start` answers `429 LOGIN_RATE_LIMITED` while the cooldown is active.
+  `POST /api/auth/login/start` answers `429` with the flat payload
+  `{ error: "LOGIN_RATE_LIMITED", message, retryAfter }` (seconds remaining) while the
+  cooldown is active. `mode: 'window'` bypasses the QR cooldown entirely.
+- Engine errors cross a module boundary (the engine is loaded by `tsx`, route handlers are
+  bundled by Next), so error mapping never relies on `instanceof` alone: `EngineError`
+  carries an `isEngineError` marker that route handlers detect structurally. Regression
+  tests simulate duplicated class copies.
 - `POST /api/auth/login/start` accepts `{ mode: 'qr' | 'window' }`. In `window` mode the
   engine opens a headed Chromium at the TikTok login page and only polls for the
   `sessionid` cookie, so the user can complete login with password or QR inside the window —

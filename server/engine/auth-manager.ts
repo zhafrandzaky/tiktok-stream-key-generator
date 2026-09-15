@@ -12,6 +12,8 @@ export const DEFAULT_LOGIN_URLS = [
   "https://www.tiktok.com/login?lang=en",
 ]
 
+export const WINDOW_LOGIN_URLS = ["https://www.tiktok.com/login?lang=en"]
+
 export const QR_SELECTORS = [
   'canvas[data-e2e*="qr" i]',
   '[data-e2e*="qrcode" i] canvas',
@@ -152,7 +154,9 @@ export function createAuthManager(deps: {
     detail = description
       ? `${description} QR login is paused for ~${minutes} min — or use "Open login window".`
       : `TikTok rate-limited QR login. It is paused for ~${minutes} min — or use "Open login window".`
-    await parkLoginPage()
+    if (activeMode === "qr") {
+      await parkLoginPage()
+    }
   }
 
   const handleResponse = async (response: Response) => {
@@ -262,7 +266,7 @@ export function createAuthManager(deps: {
     return qr ?? (await captureQrFromPage(page))
   }
 
-  const openLoginPage = async (context: BrowserContext): Promise<Page> => {
+  const openLoginPage = async (context: BrowserContext, urls: string[] = loginUrls): Promise<Page> => {
     if (parked) {
       loginPage = null
       parked = false
@@ -271,7 +275,7 @@ export function createAuthManager(deps: {
     loginPage = page
     instrumentPage(page)
 
-    for (const url of loginUrls) {
+    for (const url of urls) {
       const loaded = await page
         .goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 })
         .then(() => true)
@@ -362,9 +366,10 @@ export function createAuthManager(deps: {
     async start(mode: LoginMode = "qr"): Promise<AuthQr> {
       if (session.status === "authenticated") throw new AlreadyAuthenticatedError()
       if (mode === "qr" && Date.now() < rateLimitedUntil) {
-        const minutes = Math.max(1, Math.ceil((rateLimitedUntil - Date.now()) / 60_000))
+        const remainingSeconds = Math.max(1, Math.ceil((rateLimitedUntil - Date.now()) / 1000))
         throw new LoginRateLimitedError(
-          `TikTok is still rate-limiting QR login. Retry in ~${minutes} min, or use "Open login window".`,
+          `TikTok is still rate-limiting QR login. Retry in ~${Math.ceil(remainingSeconds / 60)} min, or use "Open login window".`,
+          remainingSeconds,
         )
       }
 
@@ -379,7 +384,7 @@ export function createAuthManager(deps: {
 
       await deps.store.clear().catch(() => undefined)
       activeMode = mode
-      const page = await openLoginPage(context)
+      const page = mode === "window" ? await openLoginPage(context, WINDOW_LOGIN_URLS) : await openLoginPage(context)
 
       if (mode === "window") {
         detail = "Complete the login in the browser window. This page detects it automatically."
@@ -390,7 +395,11 @@ export function createAuthManager(deps: {
       const captured = await waitForQrSession(page)
       if (!captured) {
         if (Date.now() < rateLimitedUntil) {
-          throw new LoginRateLimitedError()
+          const remainingSeconds = Math.max(1, Math.ceil((rateLimitedUntil - Date.now()) / 1000))
+          throw new LoginRateLimitedError(
+            `TikTok is rate-limiting QR login. Retry in ~${Math.ceil(remainingSeconds / 60)} min, or use "Open login window".`,
+            remainingSeconds,
+          )
         }
         throw new LoginPageFailedError()
       }

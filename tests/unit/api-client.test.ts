@@ -44,6 +44,29 @@ describe("api-client", () => {
     expect(error).toMatchObject({ code: "AUTH_REQUIRED", status: 401, message: "Sign in first" })
   })
 
+  it("parses flat 429 payloads with retryAfter", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse(429, {
+          error: "LOGIN_RATE_LIMITED",
+          message: "TikTok is still rate-limiting QR login.",
+          retryAfter: 240,
+        }),
+      ),
+    )
+    const error = await apiPost("/api/auth/login/start", { mode: "qr" }).catch(
+      (value: unknown) => value,
+    )
+    expect(error).toBeInstanceOf(ApiError)
+    expect(error).toMatchObject({
+      code: "LOGIN_RATE_LIMITED",
+      status: 429,
+      retryAfter: 240,
+      message: "TikTok is still rate-limiting QR login.",
+    })
+  })
+
   it("falls back to a generic message when the error body is not JSON", async () => {
     vi.stubGlobal(
       "fetch",

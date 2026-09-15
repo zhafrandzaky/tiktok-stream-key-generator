@@ -68,20 +68,56 @@ describe("auth routes", () => {
     expect(modes).toEqual(["window", "qr", "qr"])
   })
 
-  it("maps LoginRateLimitedError to 429", async () => {
+  it("maps LoginRateLimitedError to a flat 429 payload with retryAfter", async () => {
     setEngine(
       createTestEngine({
         auth: {
           ...createTestEngine().auth,
           start: async () => {
-            throw new LoginRateLimitedError("paused")
+            throw new LoginRateLimitedError("paused", 240)
           },
         },
       }),
     )
     const res = await startRoute(startRequest())
     expect(res.status).toBe(429)
-    expect((await res.json()).error.code).toBe("LOGIN_RATE_LIMITED")
+    expect(await res.json()).toEqual({
+      error: "LOGIN_RATE_LIMITED",
+      message: "paused",
+      retryAfter: 240,
+    })
+  })
+
+  it("maps cross-module engine errors (duplicated class copies) instead of 500", async () => {
+    class ForeignRateLimitedError extends Error {
+      readonly isEngineError = true
+      readonly code: string
+      readonly retryAfter: number
+
+      constructor(code: string, retryAfter: number) {
+        super("rate limited from another module instance")
+        this.name = "LoginRateLimitedError"
+        this.code = code
+        this.retryAfter = retryAfter
+      }
+    }
+    setEngine(
+      createTestEngine({
+        auth: {
+          ...createTestEngine().auth,
+          start: async () => {
+            throw new ForeignRateLimitedError("LOGIN_RATE_LIMITED", 120)
+          },
+        },
+      }),
+    )
+    const res = await startRoute(startRequest())
+    expect(res.status).toBe(429)
+    expect(await res.json()).toEqual({
+      error: "LOGIN_RATE_LIMITED",
+      message: "rate limited from another module instance",
+      retryAfter: 120,
+    })
   })
 
   it("rejects invalid JSON bodies with 400", async () => {

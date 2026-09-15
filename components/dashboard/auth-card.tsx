@@ -112,6 +112,12 @@ export function AuthCard() {
         await refreshStatus()
         return
       }
+      if (error instanceof ApiError && error.code === "LOGIN_RATE_LIMITED") {
+        const minutes = Math.max(1, Math.ceil((error.retryAfter ?? 300) / 60))
+        toast.error(`TikTok rate-limited QR login. Retry in ~${minutes} min, or use "Open login window".`)
+        await refreshStatus()
+        return
+      }
       toast.error(error instanceof Error ? error.message : "Could not start login")
       await refreshStatus()
     } finally {

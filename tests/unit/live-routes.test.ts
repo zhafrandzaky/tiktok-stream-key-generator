@@ -92,6 +92,32 @@ describe("live routes", () => {
     expect((await res.json()).error.code).toBe("AUTH_REQUIRED")
   })
 
+  it("maps cross-module engine errors (duplicated class copies) instead of 500", async () => {
+    class ForeignAuthRequiredError extends Error {
+      readonly isEngineError = true
+      readonly code = "AUTH_REQUIRED"
+
+      constructor() {
+        super("You need to sign in to TikTok first.")
+        this.name = "AuthRequiredError"
+      }
+    }
+    setEngine(
+      createTestEngine({
+        live: {
+          create: async () => {
+            throw new ForeignAuthRequiredError()
+          },
+          end: async () => {},
+          status: async () => ({ authenticated: false, live: false }),
+        },
+      }),
+    )
+    const res = await createLive(createRequest({ title: "T" }))
+    expect(res.status).toBe(401)
+    expect((await res.json()).error.code).toBe("AUTH_REQUIRED")
+  })
+
   it("maps NotEligibleError to 409", async () => {
     setEngine(
       createTestEngine({

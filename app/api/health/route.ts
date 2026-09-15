@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { EngineUnavailableError } from "@/server/engine/errors"
+import { toEngineErrorLike } from "@/server/http"
 import { getEngine } from "@/server/engine/singleton"
 
 export async function GET() {
@@ -7,9 +7,10 @@ export async function GET() {
     const engine = await getEngine().getStatus()
     return NextResponse.json({ status: "ok", engine })
   } catch (error) {
-    if (error instanceof EngineUnavailableError) {
+    if (toEngineErrorLike(error)?.code === "ENGINE_UNAVAILABLE") {
       return NextResponse.json({ status: "engine_unavailable" }, { status: 503 })
     }
+    console.error("[api] health check failed", error)
     return NextResponse.json({ status: "error" }, { status: 500 })
   }
 }
