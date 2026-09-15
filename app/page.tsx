@@ -22,7 +22,7 @@ export default function Home() {
           <LiveStudio />
         </section>
 
-        <section className="min-w-0">
+        <section className="min-w-0 lg:relative">
           <ChatPanel />
         </section>
       </div>
