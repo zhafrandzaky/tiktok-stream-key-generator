@@ -20,6 +20,11 @@ describe("findRtmpPayload", () => {
     expect(findRtmpPayload(payload)).toEqual({ pushUrl: "rtmp://cdn/app", streamKey: "nested-1" })
   })
 
+  it("finds payloads inside arrays", () => {
+    const payload = { responses: [{ ignored: true }, { stream_url: "rtmp://cdn/app", stream_key: "array-key" }] }
+    expect(findRtmpPayload(payload)).toEqual({ streamUrl: "rtmp://cdn/app", streamKey: "array-key" })
+  })
+
   it("returns null when no rtmp fields exist", () => {
     expect(findRtmpPayload({ status_code: 400, message: "nope" })).toBeNull()
   })
@@ -95,5 +100,20 @@ describe("extractRtmp", () => {
     } catch (error) {
       expect((error as Error).message).not.toContain("super-secret-key")
     }
+  })
+
+  it("rejects combined push urls without a plausible key segment", () => {
+    expect(() => extractRtmp(JSON.stringify({ push_url: "rtmp://push.example.com/app" }))).toThrow(
+      RtmpParseError,
+    )
+    expect(() => extractRtmp(JSON.stringify({ push_url: "rtmp://push.example.com/live/ab" }))).toThrow(
+      RtmpParseError,
+    )
+  })
+
+  it("ignores empty stream keys", () => {
+    expect(() =>
+      extractRtmp(JSON.stringify({ stream_url: "rtmp://cdn/app", stream_key: "   " })),
+    ).toThrow(RtmpParseError)
   })
 })

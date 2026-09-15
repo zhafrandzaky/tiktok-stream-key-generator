@@ -135,4 +135,39 @@ describe("normalizeWebcastEvent", () => {
     expect(normalizeWebcastEvent("chat", null, at)).toBeNull()
     expect(normalizeWebcastEvent("roomUser", { viewerCount: "many" }, at)).toBeNull()
   })
+
+  it("handles missing optional fields defensively", () => {
+    expect(normalizeWebcastEvent("chat", { user: { uniqueId: "a", nickname: "A" } }, at)).toMatchObject({
+      comment: "",
+    })
+    expect(normalizeWebcastEvent("gift", { user: { uniqueId: "a", nickname: "A" } }, at)).toMatchObject({
+      giftId: "",
+      repeatCount: 1,
+      streakEnd: true,
+    })
+    expect(normalizeWebcastEvent("gift", { user: { uniqueId: "a", nickname: "A" } }, at)).not.toHaveProperty(
+      "diamonds",
+    )
+    expect(normalizeWebcastEvent("gift", { giftDetails: {} }, at)).toBeNull()
+    expect(normalizeWebcastEvent("follow", {}, at)).toBeNull()
+    expect(normalizeWebcastEvent("member", { user: { uniqueId: "a", nickname: "A" } }, at)).not.toHaveProperty(
+      "viewerCount",
+    )
+    expect(normalizeWebcastEvent("social", { user: { uniqueId: "a", nickname: "A" } }, at)).toBeNull()
+    expect(normalizeWebcastEvent("status", {}, at)).toBeNull()
+  })
+
+  it("normalizes likes without a user and with default count", () => {
+    expect(normalizeWebcastEvent("like", {}, at)).toEqual({ type: "like", count: 1, at })
+  })
+
+  it("normalizes control events without details", () => {
+    expect(normalizeWebcastEvent("connected", {}, at)).toEqual({ type: "status", state: "connected", at })
+    expect(normalizeWebcastEvent("disconnected", {}, at)).toEqual({
+      type: "status",
+      state: "disconnected",
+      at,
+    })
+    expect(normalizeWebcastEvent("error", {}, at)).toEqual({ type: "status", state: "error", at })
+  })
 })

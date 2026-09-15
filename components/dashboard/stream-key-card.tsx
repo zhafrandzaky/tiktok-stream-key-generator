@@ -111,7 +111,9 @@ export function StreamKeyCard({
           <div className="rounded-xl border border-border/60 bg-background/40 p-3">
             <p className="text-xs text-muted-foreground">Server URL (RTMP)</p>
             <div className="mt-1 flex items-center justify-between gap-2">
-              <code className="min-w-0 truncate text-sm">{room.rtmpUrl}</code>
+              <code data-testid="rtmp-url" className="min-w-0 truncate text-sm">
+                {room.rtmpUrl}
+              </code>
               <CopyButton
                 value={room.rtmpUrl}
                 label="Server URL"
@@ -123,7 +125,7 @@ export function StreamKeyCard({
           <div className="rounded-xl border border-border/60 bg-background/40 p-3">
             <p className="text-xs text-muted-foreground">Stream key</p>
             <div className="mt-1 flex items-center justify-between gap-2">
-              <code className="min-w-0 truncate text-sm">
+              <code data-testid="stream-key" className="min-w-0 truncate text-sm">
                 {revealed ? room.streamKey : maskKey(room.streamKey)}
               </code>
               <div className="flex shrink-0 items-center gap-1">

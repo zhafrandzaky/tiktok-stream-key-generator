@@ -1,36 +1,134 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TikTok Live Studio Kit
 
-## Getting Started
+Local web app for TikTok LIVE creators: sign in with an in-page QR code, create a live room and
+copy the RTMP server URL + stream key straight into OBS Studio, and read live chat, gifts,
+follows and viewer counts in real time over WebSocket — including a transparent overlay route
+made for OBS Browser Sources.
 
-First, run the development server:
+> **Disclaimer — unofficial tool.** TikTok has no public API for live-room creation or
+> stream-key retrieval. This project automates TikTok's own web pages with a local Chromium
+> instance and reads the public chat feed with an unofficial library. It may violate TikTok's
+> Terms of Service and your account could be restricted. Use it on an account you can afford to
+> lose, at your own risk. No credentials ever leave your machine.
+
+## Features
+
+- **QR login in the web UI.** A Playwright-driven Chromium loads TikTok's login page, the QR
+  code is captured and rendered in the dashboard, and login state is polled automatically.
+  If TikTok asks for human verification, a headed browser window opens so you can solve it.
+- **Stream key extraction.** Fill in the live title, category and age restriction, click
+  *Create live room*, and the app intercepts TikTok's own response to return the RTMP server
+  URL and stream key. Sessions persist under `.data/` so you do not log in every time.
+- **Real-time chat & events.** Comments, gifts (streak-aware), follows, shares, likes, member
+  joins, viewer counts and stream-end events stream over WebSocket.
+- **OBS overlay.** `/overlay/chat` renders transparent, high-contrast rows ready for a Browser
+  Source or Custom Browser Dock.
+- **Apple-style liquid glass UI.** Layered translucency, hairline borders and restrained
+  micro-interactions on top of shadcn/ui + Magic UI. Dark and light themes.
+
+## Requirements
+
+- Node.js >= 20.9
+- npm
+- Chromium for Playwright (`npm run setup:browser` — one-time download)
+
+## Install
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run setup:browser
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Run
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run dev          # development, http://localhost:3000
+npm run build        # production build
+npm start            # production server
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Open `http://localhost:3000`, sign in with the QR code, then create a live room.
 
-## Learn More
+## Using with OBS Studio
 
-To learn more about Next.js, take a look at the following resources:
+1. Copy **Server URL** and **Stream key** from the *OBS credentials* card
+   (Settings → Stream → Service: Custom…).
+2. Add the chat overlay: Add → Browser → URL:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+   ```
+   http://localhost:3000/overlay/chat
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+   or use it as a **Custom Browser Dock** (View → Docks → Custom Browser Docks).
 
-## Deploy on Vercel
+Overlay query parameters:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Param | Default | Description |
+|---|---|---|
+| `theme` | `dark` | `dark` or `light` text/chip colors |
+| `fontSize` | `28` | Font size in px (12–64) |
+| `max` | `12` | Max visible rows (1–50) |
+| `showGifts` | `1` | Show gift rows |
+| `showLikes` | `0` | Show like rows |
+| `showFollows` | `1` | Show follow/share rows |
+| `showViewers` | `1` | Show the viewer-count chip |
+| `showStatus` | `1` | Show connection/status rows |
+| `chip` | `1` | Draw translucent chips behind rows |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Example: `http://localhost:3000/overlay/chat?theme=dark&fontSize=32&max=8&showLikes=1`
+
+## Configuration
+
+Copy `.env.example` to `.env` if you want to override defaults:
+
+| Env | Default | Purpose |
+|---|---|---|
+| `PORT` | `3000` | HTTP + WebSocket port |
+| `DATA_DIR` | `.data` | Session state, Chromium profile, debug artifacts |
+| `SIGN_API_KEY` | — | Optional [Euler Stream](https://www.eulerstream.com) key for the chat connector (higher rate limits) |
+| `TIKTOK_HEADLESS` | `1` | Set to `0` to always open a visible browser window |
+| `E2E_MOCK_TIKTOK` | — | `1` runs the deterministic fake engine (used by tests) |
+
+## Architecture
+
+One Node process (`server/index.ts`, run with `tsx`) hosts the Next.js request handler and a
+`ws` chat bridge on the same port; `/ws/chat` upgrades go to the bridge, everything else to
+Next. A Playwright-driven engine (auth, live-room extraction, chat connection) lives outside
+the Next bundle and is reached from route handlers through a `globalThis` singleton, so no
+heavy dependency is ever bundled into the app. All external payloads are normalized by pure
+parsers in `lib/parsers/`, which is where the unit tests concentrate.
+
+Debug artifacts from failed extractions are written to `.data/artifacts/` (screenshots and
+response key names only — never stream keys).
+
+## Testing
+
+```bash
+npm test             # unit + contract tests (Vitest)
+npm run test:coverage
+npm run test:e2e     # Playwright, runs against the fake engine
+```
+
+E2E tests never touch TikTok: `E2E_MOCK_TIKTOK=1` swaps in a deterministic fake engine whose
+QR/login and chat events are scripted. Visual smoke helpers live in `scripts/smoke-auth.mjs`.
+
+## Troubleshooting
+
+- **"TikTok requires human verification"** — solve the check in the browser window that just
+  opened; the app keeps polling and continues automatically.
+- **`ENGINE_UNAVAILABLE` / "Engine is not running"** — start the app with `npm run dev`
+  (a plain `next dev` has no engine process).
+- **"The TikTok session expired"** — click *Switch account* and scan a fresh QR code.
+- **"Not eligible to go live from the web"** — TikTok only exposes web live creation to some
+  accounts/regions; use the TikTok LIVE Studio app for those accounts.
+- **Chat says "not live"** — the connector only reads streams that are currently live.
+- **Chat disconnects repeatedly** — the free signing tier of the connector is rate-limited;
+  create an Euler Stream key and set `SIGN_API_KEY`.
+- **Browser download missing** — run `npm run setup:browser`.
+- **Extraction fails after a TikTok redesign** — check `.data/artifacts/` and update the URL
+  candidates/selectors in `server/engine/live-room.ts` and `server/engine/auth-manager.ts`.
+
+## License notes
+
+`tiktok-live-connector` is AGPL-3.0. Personal/local use is fine; redistributing a derivative
+work requires AGPL compliance. This project is provided for personal use with no warranty.
