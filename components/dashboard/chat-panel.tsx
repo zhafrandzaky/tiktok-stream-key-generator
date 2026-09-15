@@ -166,32 +166,39 @@ export function ChatPanel() {
     }
   }
 
+  const viewerBadges = viewerStats ? (
+    <>
+      <Badge data-testid="viewer-count" variant="outline" className="rounded-lg tabular-nums">
+        <NumberTicker value={viewerStats.count} className="text-xs font-semibold" />
+        <span className="ml-1 text-xs text-muted-foreground">viewers</span>
+      </Badge>
+      {viewerStats.total !== undefined ? (
+        <Badge data-testid="viewer-total" variant="outline" className="rounded-lg tabular-nums">
+          <NumberTicker value={viewerStats.total} className="text-xs font-semibold" />
+          <span className="ml-1 text-xs text-muted-foreground">total entered</span>
+        </Badge>
+      ) : null}
+    </>
+  ) : null
+
   return (
     <GlassPanel className="p-6 lg:absolute lg:inset-0 lg:flex lg:flex-col">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           <MessagesSquare className="size-4 text-muted-foreground" />
           <h2 className="text-sm font-semibold tracking-tight">Live chat &amp; events</h2>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          {viewerStats ? (
-            <>
-              <Badge data-testid="viewer-count" variant="outline" className="rounded-lg tabular-nums">
-                <NumberTicker value={viewerStats.count} className="text-xs font-semibold" />
-                <span className="ml-1 text-xs text-muted-foreground">viewers</span>
-              </Badge>
-              {viewerStats.total !== undefined ? (
-                <Badge data-testid="viewer-total" variant="outline" className="rounded-lg tabular-nums">
-                  <NumberTicker value={viewerStats.total} className="text-xs font-semibold" />
-                  <span className="ml-1 text-xs text-muted-foreground">total entered</span>
-                </Badge>
-              ) : null}
-            </>
-          ) : null}
-          <Badge variant={connected ? "secondary" : "outline"} className="rounded-lg">
-            {connected ? "Socket live" : "Socket idle"}
-          </Badge>
-        </div>
+        {viewerBadges ? (
+          <div className="order-2 flex w-full flex-wrap items-center gap-2 lg:order-1 lg:w-auto">
+            {viewerBadges}
+          </div>
+        ) : null}
+        <Badge
+          variant={connected ? "secondary" : "outline"}
+          className="order-1 rounded-lg lg:order-2"
+        >
+          {connected ? "Socket live" : "Socket idle"}
+        </Badge>
       </div>
 
       <Separator className="my-4 opacity-60" />
