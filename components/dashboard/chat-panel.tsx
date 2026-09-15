@@ -216,7 +216,7 @@ export function ChatPanel() {
         )}
       </div>
 
-      <div className="mt-4 grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
+      <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
         <section className="min-w-0 lg:flex lg:min-h-0 lg:flex-col">
           <h3 className="mb-2 text-xs font-medium text-muted-foreground">Chat</h3>
           <AutoScrollList
