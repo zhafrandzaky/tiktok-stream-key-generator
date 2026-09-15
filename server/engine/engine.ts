@@ -3,6 +3,7 @@ import { createAuthManager } from "./auth-manager"
 import { createBrowserManager } from "./browser"
 import { EngineError } from "./errors"
 import { createEventBus } from "./events"
+import { createLiveRoom } from "./live-room"
 import { createSessionStore, type SessionStore } from "./session-store"
 
 export type EngineStatus = {
@@ -70,11 +71,11 @@ export function createEngine(deps: EngineDeps): EngineHandle {
   })
   const auth = createAuthManager({ browsers, store })
 
-  const live: LiveController = {
-    create: notImplemented("live.create") as LiveController["create"],
-    end: async () => {},
-    status: async () => ({ authenticated: false, live: false }),
-  }
+  const live: LiveController = createLiveRoom({
+    browsers,
+    auth,
+    dataDir: deps.dataDir,
+  })
 
   const chat: ChatController = {
     connect: notImplemented("chat.connect") as ChatController["connect"],
