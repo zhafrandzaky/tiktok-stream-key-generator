@@ -13,7 +13,7 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: "E2E_MOCK_TIKTOK=1 PORT=3100 npm run dev",
+    command: "NEXT_DIST_DIR=.next-e2e E2E_MOCK_TIKTOK=1 PORT=3100 npm run dev",
     url: "http://localhost:3100/api/health",
     reuseExistingServer: false,
     timeout: 120_000,
