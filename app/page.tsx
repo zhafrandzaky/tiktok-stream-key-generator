@@ -1,6 +1,6 @@
 import { AuthCard } from "@/components/dashboard/auth-card"
+import { ChatPanel } from "@/components/dashboard/chat-panel"
 import { LiveStudio } from "@/components/dashboard/live-studio"
-import { GlassPanel } from "@/components/glass-panel"
 import { ThemeToggle } from "@/components/theme-toggle"
 
 export default function Home() {
@@ -23,13 +23,7 @@ export default function Home() {
 
         <section className="space-y-6">
           <LiveStudio />
-
-          <GlassPanel className="p-6">
-            <h2 className="text-sm font-semibold tracking-tight">Live chat &amp; events</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Connect a live room to stream comments, gifts, follows and viewers in real time.
-            </p>
-          </GlassPanel>
+          <ChatPanel />
         </section>
       </div>
 
