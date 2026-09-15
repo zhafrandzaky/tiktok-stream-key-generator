@@ -135,6 +135,12 @@ QR/login and chat events are scripted. For manual visual checks, start the dev s
   the cooldown — hammering the QR flow keeps the limit alive. If QR still fails hours later,
   the limit is tied to your network path; try another connection (e.g. phone hotspot) or just
   keep using the login window.
+- **"Maximum number of attempts reached" when submitting email/password** — TikTok temporarily
+  blocks login attempts for the account/network after too many tries (QR confirmations count
+  toward the same anti-abuse budget). The app detects this inside the login window and mirrors
+  it on the dashboard. Stop all login attempts for 15–60 minutes — retrying extends the block —
+  then try again. If it persists for hours, switch network (e.g. phone hotspot) or wait longer;
+  the block is entirely on TikTok's side and cannot be bypassed.
 - **`ENGINE_UNAVAILABLE` / "Engine is not running"** — start the app with `npm run dev`
   (a plain `next dev` has no engine process).
 - **"The TikTok session expired"** — click *Switch account* and scan a fresh QR code.

@@ -1,6 +1,11 @@
 import { createHash } from "node:crypto"
 import type { BrowserContext, Locator, Page, Response } from "playwright"
-import { parseQrCheck, parseQrSession, type QrSession } from "@/lib/parsers/tiktok-auth"
+import {
+  isMaximumAttemptsMessage,
+  parseQrCheck,
+  parseQrSession,
+  type QrSession,
+} from "@/lib/parsers/tiktok-auth"
 import type { SessionState } from "@/lib/types"
 import type { BrowserManager } from "./browser"
 import type { AuthController, AuthQr, AuthStatus, LoginMode } from "./engine"
@@ -80,6 +85,14 @@ function isVisible(locator: Locator): Promise<boolean> {
 
 function hashQrDataUrl(dataUrl: string): string {
   return createHash("sha256").update(dataUrl).digest("hex").slice(0, 16)
+}
+
+function tryParseJson(raw: string): unknown {
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
 }
 
 export function createAuthManager(deps: {
@@ -180,31 +193,56 @@ export function createAuthManager(deps: {
     }
   }
 
+  const handleLoginBlocked = async () => {
+    if (Date.now() < rateLimitedUntil) return
+    const previous = await rateLimitStore.read().catch(() => null)
+    const { state, cooldownMs } = computeRateLimitHit(previous)
+    rateLimitedUntil = state.until
+    await rateLimitStore.write(state).catch(() => undefined)
+    const minutes = Math.max(1, Math.ceil(cooldownMs / 60_000))
+    detail = `TikTok blocked login attempts from this network (too many tries). Wait ~${minutes} min without retrying — repeated attempts extend the block.`
+    if (activeMode === "qr") {
+      await parkLoginPage()
+    }
+  }
+
   const handleResponse = async (response: Response) => {
     const url = response.url()
+    const isPassport = url.includes("/passport/") || url.includes("/api/")
+    if (!isPassport) return
+
+    const raw = await response.text().catch(() => "")
+    if (!raw) return
+
     if (url.includes(GET_QRCODE_PATH)) {
-      const payload = await response.json().catch(() => null)
+      const payload = tryParseJson(raw)
       const parsed = parseQrSession(payload)
       if (parsed) applyQrSession(parsed)
       return
     }
-    if (!url.includes(CHECK_QRCONNECT_PATH)) return
-    if (response.status() !== 200) return
-    const payload = await response.json().catch(() => null)
-    const check = parseQrCheck(payload)
-    if (check.state === "rate_limited") {
-      await handleRateLimited(check.description)
+
+    if (url.includes(CHECK_QRCONNECT_PATH)) {
+      if (response.status() !== 200) return
+      const check = parseQrCheck(tryParseJson(raw))
+      if (check.state === "rate_limited") {
+        await handleRateLimited(check.description)
+        return
+      }
+      if (check.state === "error") return
+      if (check.state === "scanned") {
+        detail = "QR scanned — confirm the login on your phone."
+      } else if (check.state === "expired") {
+        detail = "QR expired — TikTok is refreshing the code."
+      } else if (check.state === "confirmed") {
+        detail = "Login confirmed — finishing sign-in…"
+      }
+      await clearRateLimit()
       return
     }
-    if (check.state === "error") return
-    if (check.state === "scanned") {
-      detail = "QR scanned — confirm the login on your phone."
-    } else if (check.state === "expired") {
-      detail = "QR expired — TikTok is refreshing the code."
-    } else if (check.state === "confirmed") {
-      detail = "Login confirmed — finishing sign-in…"
+
+    if (isMaximumAttemptsMessage(raw)) {
+      await handleLoginBlocked()
     }
-    await clearRateLimit()
   }
 
   const instrumentPage = (page: Page) => {
@@ -377,7 +415,15 @@ export function createAuthManager(deps: {
         return
       }
 
-      if (activeMode === "window") return
+      if (activeMode === "window") {
+        const blocked = await page
+          .getByText(/maximum number of attempts|too many (login )?attempts/i)
+          .first()
+          .isVisible({ timeout: 250 })
+          .catch(() => false)
+        if (blocked) await handleLoginBlocked()
+        return
+      }
 
       const hasQr = Boolean(await findVisible(page, QR_SELECTORS))
       if (hasQr && !qr) {

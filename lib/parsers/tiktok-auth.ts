@@ -48,7 +48,7 @@ export function parseQrCheck(payload: unknown): QrCheck {
 
   if (message !== undefined && message !== "success") {
     const rateLimited =
-      errorCode === 7 || /maximum number of attempts|too many (requests|attempts)/i.test(description ?? "")
+      errorCode === 7 || isMaximumAttemptsMessage(description ?? "")
     return {
       state: rateLimited ? "rate_limited" : "error",
       ...(description ? { description } : {}),
@@ -62,4 +62,8 @@ export function parseQrCheck(payload: unknown): QrCheck {
   if (/expire/.test(body)) return { state: "expired", ...(description ? { description } : {}) }
   if (/scan/.test(body)) return { state: "scanned", ...(description ? { description } : {}) }
   return { state: "waiting", ...(description ? { description } : {}) }
+}
+
+export function isMaximumAttemptsMessage(text: string): boolean {
+  return /maximum number of attempts|too many (login )?attempts/i.test(text)
 }

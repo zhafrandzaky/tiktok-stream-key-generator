@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { parseQrCheck, parseQrSession } from "@/lib/parsers/tiktok-auth"
+import { isMaximumAttemptsMessage, parseQrCheck, parseQrSession } from "@/lib/parsers/tiktok-auth"
 
 const QR_PNG_PREFIX = "iVBORw0KGgoAAAANSUhEUgAAAgAAAAIAAQMAAADOtka5"
 
@@ -82,5 +82,18 @@ describe("parseQrCheck", () => {
   it("returns error for malformed payloads", () => {
     expect(parseQrCheck(null)).toEqual({ state: "error" })
     expect(parseQrCheck("nope")).toEqual({ state: "error" })
+  })
+})
+
+describe("isMaximumAttemptsMessage", () => {
+  it("detects TikTok's attempt-limit wording in any casing", () => {
+    expect(isMaximumAttemptsMessage("Maximum number of attempts reached. Try again later.")).toBe(true)
+    expect(isMaximumAttemptsMessage('{"description":"maximum number of attempts reached"}')).toBe(true)
+    expect(isMaximumAttemptsMessage("Too many login attempts, please try again")).toBe(true)
+  })
+
+  it("does not match unrelated text", () => {
+    expect(isMaximumAttemptsMessage("Maximum upload size reached")).toBe(false)
+    expect(isMaximumAttemptsMessage("")).toBe(false)
   })
 })

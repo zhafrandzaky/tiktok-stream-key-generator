@@ -191,6 +191,11 @@ Route handlers are thin: validate input, call engine, map typed errors to HTTP c
   restarts** and escalates on repeated hits (5 → 15 → 60 minutes), and reports
   `rateLimited` + `retryAfter` through `status()`. QR traffic is fully suppressed until the
   cooldown expires; a successful `check_qrconnect` clears the stored state.
+- The same attempt budget applies to password login (`Maximum number of attempts reached`
+  after submitting credentials). The manager inspects every `/passport/` and `/api/` JSON
+  response for that message and, in window mode, also polls the page text for it. On
+  detection it records the persisted cooldown and surfaces actionable guidance on the
+  dashboard instead of leaving the user guessing inside TikTok's own window.
 - `POST /api/auth/login/start` accepts `{ mode: 'qr' | 'window' }`. In `window` mode the
   engine opens a headed Chromium directly on
   `https://www.tiktok.com/login/phone-or-email/email` (verified: zero `check_qrconnect`
