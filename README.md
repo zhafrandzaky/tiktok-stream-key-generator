@@ -91,6 +91,19 @@ Overlay query parameters:
 
 Example: `http://localhost:3000/overlay/chat?theme=dark&fontSize=32&max=8&showLikes=1`
 
+### Portrait (9:16) streaming for TikTok
+
+The stream key is orientation-agnostic — set the canvas in OBS:
+
+1. **Settings → Video**: Base (Canvas) `1080x1920`, Output (Scaled) `1080x1920`
+   (or `720x1280`), FPS `30`, then accept the source-reset prompt.
+2. Right-click each source → **Transform → Fit to Screen** (or *Stretch to Screen* to fill,
+   *Scale to Outer Bounds* + center to crop a landscape camera).
+3. **Settings → Output → Advanced → Streaming**: CBR, `4000–6000 Kbps` for 1080×1920
+   (`2500–3500` for 720×1280), keyframe `1–2s`, x264 `veryfast` or NVENC `Quality`,
+   AAC `128 Kbps`.
+4. Test with **Start Virtual Camera** before going live.
+
 ## Configuration
 
 Copy `.env.example` to `.env` if you want to override defaults:
