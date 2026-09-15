@@ -3,7 +3,7 @@ import { POST as logoutRoute } from "@/app/api/auth/logout/route"
 import { POST as startRoute } from "@/app/api/auth/login/start/route"
 import { GET as statusRoute } from "@/app/api/auth/login/status/route"
 import { GET as sessionRoute } from "@/app/api/auth/session/route"
-import { CaptchaError } from "@/server/engine/errors"
+import { CaptchaError, LoginRateLimitedError } from "@/server/engine/errors"
 import { setEngine, type EngineHandle } from "@/server/engine/singleton"
 
 function createTestEngine(overrides: Partial<EngineHandle> = {}): EngineHandle {
@@ -33,12 +33,64 @@ function createTestEngine(overrides: Partial<EngineHandle> = {}): EngineHandle {
 
 afterEach(() => setEngine(null))
 
+function startRequest(body?: unknown): Request {
+  return new Request("http://localhost/api/auth/login/start", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+  })
+}
+
 describe("auth routes", () => {
   it("returns the qr payload from start", async () => {
     setEngine(createTestEngine())
-    const res = await startRoute()
+    const res = await startRoute(startRequest())
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ qrDataUrl: "data:image/png;base64,AA", expiresAt: 123, version: 1 })
+  })
+
+  it("passes the requested login mode to the engine", async () => {
+    const modes: Array<string | undefined> = []
+    setEngine(
+      createTestEngine({
+        auth: {
+          ...createTestEngine().auth,
+          start: async (mode) => {
+            modes.push(mode)
+            return { qrDataUrl: "", expiresAt: 0, version: 0 }
+          },
+        },
+      }),
+    )
+    await startRoute(startRequest({ mode: "window" }))
+    await startRoute(startRequest({ mode: "qr" }))
+    await startRoute(startRequest())
+    expect(modes).toEqual(["window", "qr", "qr"])
+  })
+
+  it("maps LoginRateLimitedError to 429", async () => {
+    setEngine(
+      createTestEngine({
+        auth: {
+          ...createTestEngine().auth,
+          start: async () => {
+            throw new LoginRateLimitedError("paused")
+          },
+        },
+      }),
+    )
+    const res = await startRoute(startRequest())
+    expect(res.status).toBe(429)
+    expect((await res.json()).error.code).toBe("LOGIN_RATE_LIMITED")
+  })
+
+  it("rejects invalid JSON bodies with 400", async () => {
+    setEngine(createTestEngine())
+    const res = await startRoute(
+      new Request("http://localhost/api/auth/login/start", { method: "POST", body: "{oops" }),
+    )
+    expect(res.status).toBe(400)
+    expect((await res.json()).error.code).toBe("BAD_REQUEST")
   })
 
   it("maps CaptchaError to 409 CAPTCHA", async () => {
@@ -52,7 +104,7 @@ describe("auth routes", () => {
         },
       }),
     )
-    const res = await startRoute()
+    const res = await startRoute(startRequest())
     expect(res.status).toBe(409)
     expect((await res.json()).error.code).toBe("CAPTCHA")
   })

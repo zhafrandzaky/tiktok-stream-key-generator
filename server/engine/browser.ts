@@ -5,6 +5,7 @@ export interface BrowserManager {
   getContext(): Promise<BrowserContext>
   currentContext(): BrowserContext | null
   relaunchHeaded(): Promise<BrowserContext>
+  ensureHeaded(): Promise<BrowserContext>
   clearCookies(): Promise<void>
   dispose(): Promise<void>
   isHeaded(): boolean
@@ -54,6 +55,11 @@ export function createBrowserManager(opts: { dataDir: string; headless: boolean 
     },
 
     async relaunchHeaded(): Promise<BrowserContext> {
+      return launch(false)
+    },
+
+    async ensureHeaded(): Promise<BrowserContext> {
+      if (context && !headless) return context
       return launch(false)
     },
 

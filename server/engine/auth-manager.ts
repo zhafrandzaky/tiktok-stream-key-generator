@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto"
-import type { BrowserContext, Locator, Page } from "playwright"
+import type { BrowserContext, Locator, Page, Response } from "playwright"
+import { parseQrCheck, parseQrSession, type QrSession } from "@/lib/parsers/tiktok-auth"
 import type { SessionState } from "@/lib/types"
 import type { BrowserManager } from "./browser"
-import type { AuthController, AuthQr, AuthStatus } from "./engine"
-import { AlreadyAuthenticatedError, LoginPageFailedError } from "./errors"
+import type { AuthController, AuthQr, AuthStatus, LoginMode } from "./engine"
+import { AlreadyAuthenticatedError, LoginPageFailedError, LoginRateLimitedError } from "./errors"
 import type { SessionStore } from "./session-store"
 
 export const DEFAULT_LOGIN_URLS = [
@@ -34,6 +35,10 @@ export const IDENTITY_SELECTORS = {
 }
 
 const QR_TAB_PATTERNS = [/qr code/i, /log in with qr/i]
+const QR_CAPTURE_TIMEOUT_MS = 10_000
+const RATE_LIMIT_COOLDOWN_MS = 5 * 60_000
+const GET_QRCODE_PATH = "/passport/web/get_qrcode/"
+const CHECK_QRCONNECT_PATH = "/passport/web/check_qrconnect/"
 
 export function hasSessionCookie(cookies: Array<{ name: string; value: string }>): boolean {
   return cookies.some((cookie) => cookie.name === "sessionid" && cookie.value.trim().length > 0)
@@ -68,8 +73,8 @@ function isVisible(locator: Locator): Promise<boolean> {
     .catch(() => false)
 }
 
-function hashBuffer(buffer: Buffer): string {
-  return createHash("sha256").update(buffer).digest("hex").slice(0, 16)
+function hashQrDataUrl(dataUrl: string): string {
+  return createHash("sha256").update(dataUrl).digest("hex").slice(0, 16)
 }
 
 export function createAuthManager(deps: {
@@ -77,9 +82,13 @@ export function createAuthManager(deps: {
   store: SessionStore
   loginUrls?: string[]
   pollMs?: number
+  captureTimeoutMs?: number
+  rateLimitCooldownMs?: number
 }): AuthController {
   const loginUrls = deps.loginUrls ?? DEFAULT_LOGIN_URLS
-  const pollMs = deps.pollMs ?? 2000
+  const pollMs = deps.pollMs ?? 1000
+  const captureTimeoutMs = deps.captureTimeoutMs ?? QR_CAPTURE_TIMEOUT_MS
+  const rateLimitCooldownMs = deps.rateLimitCooldownMs ?? RATE_LIMIT_COOLDOWN_MS
 
   let session: SessionState = { status: "anonymous" }
   let qr: AuthQr | null = null
@@ -89,12 +98,23 @@ export function createAuthManager(deps: {
   let pollBusy = false
   let captchaRelaunched = false
   let loginPage: Page | null = null
+  let parked = false
+  let activeMode: LoginMode | null = null
+  let rateLimitedUntil = 0
+  const instrumented = new WeakSet<Page>()
 
   const stopPolling = () => {
     if (pollTimer) {
       clearInterval(pollTimer)
       pollTimer = null
     }
+  }
+
+  const startPolling = () => {
+    if (pollTimer) return
+    pollTimer = setInterval(() => {
+      pollOnce().catch(() => undefined)
+    }, pollMs)
   }
 
   const resolveStoredSession = async (): Promise<SessionState> => {
@@ -106,6 +126,70 @@ export function createAuthManager(deps: {
       session = { status: "authenticated" }
     }
     return session
+  }
+
+  const applyQrSession = (incoming: QrSession) => {
+    const next = bumpQrVersion(qrMeta, hashQrDataUrl(incoming.qrDataUrl))
+    qrMeta = { hash: next.hash, version: next.version }
+    if (!next.changed && qr) {
+      qr = { ...qr, expiresAt: incoming.expiresAt }
+      return
+    }
+    qr = { qrDataUrl: incoming.qrDataUrl, expiresAt: incoming.expiresAt, version: next.version }
+  }
+
+  const parkLoginPage = async () => {
+    const page = loginPage
+    if (!page || page.isClosed()) return
+    parked = true
+    await page.goto("about:blank", { timeout: 5000 }).catch(() => undefined)
+  }
+
+  const handleRateLimited = async (description?: string) => {
+    if (Date.now() < rateLimitedUntil) return
+    rateLimitedUntil = Date.now() + rateLimitCooldownMs
+    const minutes = Math.max(1, Math.ceil(rateLimitCooldownMs / 60_000))
+    detail = description
+      ? `${description} QR login is paused for ~${minutes} min — or use "Open login window".`
+      : `TikTok rate-limited QR login. It is paused for ~${minutes} min — or use "Open login window".`
+    await parkLoginPage()
+  }
+
+  const handleResponse = async (response: Response) => {
+    const url = response.url()
+    if (url.includes(GET_QRCODE_PATH)) {
+      const payload = await response.json().catch(() => null)
+      const parsed = parseQrSession(payload)
+      if (parsed) applyQrSession(parsed)
+      return
+    }
+    if (!url.includes(CHECK_QRCONNECT_PATH)) return
+    if (response.status() !== 200) return
+    const payload = await response.json().catch(() => null)
+    const check = parseQrCheck(payload)
+    if (check.state === "rate_limited") {
+      await handleRateLimited(check.description)
+      return
+    }
+    if (check.state === "scanned") {
+      detail = "QR scanned — confirm the login on your phone."
+      return
+    }
+    if (check.state === "expired") {
+      detail = "QR expired — TikTok is refreshing the code."
+      return
+    }
+    if (check.state === "confirmed") {
+      detail = "Login confirmed — finishing sign-in…"
+    }
+  }
+
+  const instrumentPage = (page: Page) => {
+    if (instrumented.has(page)) return
+    instrumented.add(page)
+    page.on("response", (response) => {
+      void handleResponse(response)
+    })
   }
 
   const findVisible = async (page: Page, selectors: string[]): Promise<Locator | null> => {
@@ -135,31 +219,57 @@ export function createAuthManager(deps: {
     return { ...(uniqueId ? { uniqueId } : {}), ...(nickname ? { nickname } : {}) }
   }
 
-  const captureQr = async (page: Page): Promise<AuthQr | null> => {
-    const element = await findVisible(page, QR_SELECTORS)
-    if (!element) return null
-    const buffer = await element.screenshot({ type: "png" }).catch(() => null)
-    if (!buffer) return null
-    const next = bumpQrVersion(qrMeta, hashBuffer(buffer))
-    const changed = next.changed
-    qrMeta = { hash: next.hash, version: next.version }
-    if (!changed && qr) {
-      if (qr.expiresAt - Date.now() < 30_000) {
-        qr = { ...qr, expiresAt: Date.now() + 120_000 }
-      }
+  const captureQrFromPage = async (page: Page): Promise<AuthQr | null> => {
+    const dataUrl = await page
+      .evaluate(() => {
+        const canvases = Array.from(document.querySelectorAll("canvas"))
+        for (const canvas of canvases) {
+          if (canvas.offsetWidth > 100 && canvas.offsetHeight > 100) {
+            try {
+              return canvas.toDataURL("image/png")
+            } catch {
+              return null
+            }
+          }
+        }
+        return null
+      })
+      .catch(() => null)
+
+    if (dataUrl) {
+      applyQrSession({ qrDataUrl: dataUrl, expiresAt: Date.now() + 120_000 })
       return qr
     }
-    qr = {
+
+    const element = await findVisible(page, QR_SELECTORS)
+    if (!element) return null
+    const buffer = await element.screenshot({ type: "png", animations: "disabled" }).catch(() => null)
+    if (!buffer) return null
+    applyQrSession({
       qrDataUrl: `data:image/png;base64,${buffer.toString("base64")}`,
       expiresAt: Date.now() + 120_000,
-      version: next.version,
-    }
+    })
     return qr
   }
 
+  const waitForQrSession = async (page: Page): Promise<AuthQr | null> => {
+    const deadline = Date.now() + captureTimeoutMs
+    while (Date.now() < deadline) {
+      if (qr) return qr
+      if (Date.now() < rateLimitedUntil) return null
+      await page.waitForTimeout(250)
+    }
+    return qr ?? (await captureQrFromPage(page))
+  }
+
   const openLoginPage = async (context: BrowserContext): Promise<Page> => {
+    if (parked) {
+      loginPage = null
+      parked = false
+    }
     const page = loginPage && !loginPage.isClosed() ? loginPage : await context.newPage()
     loginPage = page
+    instrumentPage(page)
 
     for (const url of loginUrls) {
       const loaded = await page
@@ -205,6 +315,8 @@ export function createAuthManager(deps: {
     qr = null
     qrMeta = null
     detail = undefined
+    activeMode = null
+    parked = false
   }
 
   const pollOnce = async (): Promise<void> => {
@@ -218,27 +330,28 @@ export function createAuthManager(deps: {
         await completeLogin(context)
         return
       }
+      if (parked) return
       const page = loginPage && !loginPage.isClosed() ? loginPage : context.pages().at(-1)
       if (!page) return
-      const hasQr = Boolean(await findVisible(page, QR_SELECTORS))
-      const hasCaptcha = Boolean(await findVisible(page, CAPTCHA_SELECTORS))
-      const state = classifyPageState({ hasQr, hasCaptcha, url: page.url() })
 
-      if (state === "captcha") {
+      const hasCaptcha = Boolean(await findVisible(page, CAPTCHA_SELECTORS))
+      if (hasCaptcha) {
         detail = "TikTok requires human verification. Complete it in the opened browser window."
-        if (!deps.browsers.isHeaded() && !captchaRelaunched) {
+        if (activeMode === "qr" && !deps.browsers.isHeaded() && !captchaRelaunched) {
           captchaRelaunched = true
           const relaunched = await deps.browsers.relaunchHeaded()
           loginPage = null
-          const loginPageOpened = await openLoginPage(relaunched).catch(() => null)
-          if (loginPageOpened) await captureQr(loginPageOpened)
+          const reopened = await openLoginPage(relaunched).catch(() => null)
+          if (reopened) await captureQrFromPage(reopened)
         }
         return
       }
 
-      if (hasQr) {
-        detail = undefined
-        await captureQr(page)
+      if (activeMode === "window") return
+
+      const hasQr = Boolean(await findVisible(page, QR_SELECTORS))
+      if (hasQr && !qr) {
+        await captureQrFromPage(page)
       }
     } finally {
       pollBusy = false
@@ -246,29 +359,53 @@ export function createAuthManager(deps: {
   }
 
   return {
-    async start(): Promise<AuthQr> {
+    async start(mode: LoginMode = "qr"): Promise<AuthQr> {
       if (session.status === "authenticated") throw new AlreadyAuthenticatedError()
-      const context = await deps.browsers.getContext()
+      if (mode === "qr" && Date.now() < rateLimitedUntil) {
+        const minutes = Math.max(1, Math.ceil((rateLimitedUntil - Date.now()) / 60_000))
+        throw new LoginRateLimitedError(
+          `TikTok is still rate-limiting QR login. Retry in ~${minutes} min, or use "Open login window".`,
+        )
+      }
+
+      const context =
+        mode === "window" ? await deps.browsers.ensureHeaded() : await deps.browsers.getContext()
+
       const restored = await restoreSession(context)
       if (restored) {
         await completeLogin(context)
         throw new AlreadyAuthenticatedError("Existing TikTok session restored.")
       }
+
       await deps.store.clear().catch(() => undefined)
+      activeMode = mode
       const page = await openLoginPage(context)
-      const captured = await captureQr(page)
-      if (!captured) throw new LoginPageFailedError()
-      if (!pollTimer) {
-        pollTimer = setInterval(() => {
-          pollOnce().catch(() => undefined)
-        }, pollMs)
+
+      if (mode === "window") {
+        detail = "Complete the login in the browser window. This page detects it automatically."
+        startPolling()
+        return qr ?? { qrDataUrl: "", expiresAt: 0, version: 0 }
       }
+
+      const captured = await waitForQrSession(page)
+      if (!captured) {
+        if (Date.now() < rateLimitedUntil) {
+          throw new LoginRateLimitedError()
+        }
+        throw new LoginPageFailedError()
+      }
+      startPolling()
       return captured
     },
 
     async status(): Promise<AuthStatus> {
       const current = await resolveStoredSession()
-      return { ...current, ...(qr ? { qr } : {}), ...(detail ? { detail } : {}) }
+      return {
+        ...current,
+        ...(qr ? { qr } : {}),
+        ...(detail ? { detail } : {}),
+        ...(activeMode ? { mode: activeMode } : {}),
+      }
     },
 
     async logout(): Promise<void> {
@@ -279,6 +416,9 @@ export function createAuthManager(deps: {
       detail = undefined
       captchaRelaunched = false
       loginPage = null
+      parked = false
+      activeMode = null
+      rateLimitedUntil = 0
       await deps.store.clear().catch(() => undefined)
       await deps.browsers.clearCookies()
       await deps.browsers.dispose()

@@ -1,5 +1,13 @@
 import type { ChatEvent, LiveRoomResult, LiveStatus, SessionState } from "@/lib/types"
-import type { AuthController, AuthQr, AuthStatus, ChatController, EngineHandle, LiveController } from "./engine"
+import type {
+  AuthController,
+  AuthQr,
+  AuthStatus,
+  ChatController,
+  EngineHandle,
+  LiveController,
+  LoginMode,
+} from "./engine"
 import { AlreadyAuthenticatedError, AuthRequiredError } from "./errors"
 import { createEventBus } from "./events"
 
@@ -28,6 +36,7 @@ export function createFakeEngine(options: FakeEngineOptions = {}): EngineHandle 
   const bus = createEventBus()
   let session: SessionState = { status: "anonymous" }
   let qr: AuthQr | null = null
+  let activeMode: LoginMode | null = null
   let loginTimer: ReturnType<typeof setTimeout> | null = null
   let room: LiveRoomResult | null = null
   let isLive = false
@@ -53,25 +62,32 @@ export function createFakeEngine(options: FakeEngineOptions = {}): EngineHandle 
   }
 
   const auth: AuthController = {
-    async start(): Promise<AuthQr> {
+    async start(mode: LoginMode = "qr"): Promise<AuthQr> {
       if (session.status === "authenticated") throw new AlreadyAuthenticatedError()
       stopLoginTimer()
+      activeMode = mode
       qr = { qrDataUrl: QR_PNG, expiresAt: Date.now() + 120_000, version: 1 }
       loginTimer = setTimeout(() => {
         session = { status: "authenticated", uniqueId: "demo_user", nickname: "Demo User" }
         qr = null
+        activeMode = null
         loginTimer = null
       }, loginDelayMs)
       return qr
     },
 
     async status(): Promise<AuthStatus> {
-      return { ...session, ...(qr ? { qr } : {}) }
+      return {
+        ...session,
+        ...(qr ? { qr } : {}),
+        ...(activeMode ? { mode: activeMode } : {}),
+      }
     },
 
     async logout(): Promise<void> {
       stopLoginTimer()
       qr = null
+      activeMode = null
       session = { status: "anonymous" }
       room = null
       isLive = false

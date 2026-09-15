@@ -14,8 +14,13 @@ made for OBS Browser Sources.
 ## Features
 
 - **QR login in the web UI.** A Playwright-driven Chromium loads TikTok's login page, the QR
-  code is captured and rendered in the dashboard, and login state is polled automatically.
-  If TikTok asks for human verification, a headed browser window opens so you can solve it.
+  code is read straight from TikTok's own `get_qrcode` API response (exact pixels, real
+  expiry) and rendered in the dashboard. Login state is polled automatically; a scan shows
+  "confirm on your phone" feedback. If TikTok asks for human verification, a headed browser
+  window opens so you can solve it.
+- **Browser-window fallback login.** When TikTok rate-limits QR checks (`Maximum number of
+  attempts reached`), the app pauses QR login, says so in the UI, and offers *Open login
+  window*: sign in in the visible browser (QR or password) and the app picks up the session.
 - **Stream key extraction.** Fill in the live title, category and age restriction, click
   *Create live room*, and the app intercepts TikTok's own response to return the RTMP server
   URL and stream key. Sessions persist under `.data/` so you do not log in every time.
@@ -120,6 +125,11 @@ QR/login and chat events are scripted. For manual visual checks, start the dev s
 
 - **"TikTok requires human verification"** — solve the check in the browser window that just
   opened; the app keeps polling and continues automatically.
+- **"Maximum number of attempts reached" / QR login paused** — TikTok rate-limits its QR
+  confirmation endpoint per network after many checks. The app stops polling to let the
+  budget recover, shows a countdown, and disables new QR attempts for ~5 minutes. Use
+  *Open login window* instead: log in in the visible browser (password or QR) and the session
+  is captured automatically. Avoid leaving many login attempts running in parallel.
 - **`ENGINE_UNAVAILABLE` / "Engine is not running"** — start the app with `npm run dev`
   (a plain `next dev` has no engine process).
 - **"The TikTok session expired"** — click *Switch account* and scan a fresh QR code.

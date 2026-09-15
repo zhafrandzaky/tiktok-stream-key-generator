@@ -50,6 +50,14 @@ export class LoginPageFailedError extends EngineError {
   }
 }
 
+export class LoginRateLimitedError extends EngineError {
+  constructor(
+    message = "TikTok is rate-limiting QR login attempts from this network. Wait a few minutes, or use \"Open login window\".",
+  ) {
+    super(message, "LOGIN_RATE_LIMITED")
+  }
+}
+
 export class ExtractionFailedError extends EngineError {
   constructor(message = "Could not extract the stream key from TikTok.") {
     super(message, "EXTRACTION_FAILED")

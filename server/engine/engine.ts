@@ -19,13 +19,16 @@ export type AuthQr = {
   version: number
 }
 
+export type LoginMode = "qr" | "window"
+
 export type AuthStatus = SessionState & {
   qr?: AuthQr
   detail?: string
+  mode?: LoginMode
 }
 
 export interface AuthController {
-  start(): Promise<AuthQr>
+  start(mode?: LoginMode): Promise<AuthQr>
   status(): Promise<AuthStatus>
   logout(): Promise<void>
   session(): Promise<SessionState>

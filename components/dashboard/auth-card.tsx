@@ -12,7 +12,7 @@ import { ApiError, apiGet, apiPost } from "@/lib/api-client"
 import type { SessionState } from "@/lib/types"
 
 type QrPayload = { qrDataUrl: string; expiresAt: number; version: number }
-type AuthStatusPayload = SessionState & { qr?: QrPayload; detail?: string }
+type AuthStatusPayload = SessionState & { qr?: QrPayload; detail?: string; mode?: "qr" | "window" }
 
 function formatCountdown(seconds: number): string {
   const clamped = Math.max(0, seconds)
@@ -25,6 +25,7 @@ export function AuthCard() {
   const [session, setSession] = useState<SessionState | null>(null)
   const [qr, setQr] = useState<QrPayload | null>(null)
   const [detail, setDetail] = useState<string | undefined>(undefined)
+  const [windowMode, setWindowMode] = useState(false)
   const [busy, setBusy] = useState(false)
   const [secondsLeft, setSecondsLeft] = useState(0)
   const authenticatedRef = useRef(false)
@@ -37,6 +38,7 @@ export function AuthCard() {
     })
     setQr(status.qr ?? null)
     setDetail(status.detail)
+    setWindowMode(status.status !== "authenticated" && status.mode === "window")
     if (status.qr) {
       setSecondsLeft(Math.max(0, Math.round((status.qr.expiresAt - Date.now()) / 1000)))
     }
@@ -69,7 +71,7 @@ export function AuthCard() {
   }, [refreshStatus])
 
   const isAuthenticated = session?.status === "authenticated"
-  const polling = !isAuthenticated && (qr !== null || detail !== undefined)
+  const polling = !isAuthenticated && (windowMode || qr !== null || detail !== undefined)
 
   useEffect(() => {
     if (!polling) return
@@ -87,21 +89,31 @@ export function AuthCard() {
     return () => clearInterval(id)
   }, [qr])
 
-  const startLogin = async () => {
+  const startLogin = async (mode: "qr" | "window" = "qr") => {
     setBusy(true)
     try {
-      const payload = await apiPost<QrPayload>("/api/auth/login/start")
-      setQr(payload)
-      setSecondsLeft(Math.max(0, Math.round((payload.expiresAt - Date.now()) / 1000)))
+      const payload = await apiPost<QrPayload>("/api/auth/login/start", { mode })
+      if (payload.qrDataUrl) {
+        setQr(payload)
+        setSecondsLeft(Math.max(0, Math.round((payload.expiresAt - Date.now()) / 1000)))
+      } else {
+        setQr(null)
+      }
       setDetail(undefined)
+      setWindowMode(mode === "window")
       setSession({ status: "anonymous" })
-      toast.info("Scan the QR code with the TikTok app")
+      toast.info(
+        mode === "window"
+          ? "Complete the login in the browser window"
+          : "Scan the QR code with the TikTok app",
+      )
     } catch (error) {
       if (error instanceof ApiError && error.code === "ALREADY_AUTHENTICATED") {
         await refreshStatus()
         return
       }
       toast.error(error instanceof Error ? error.message : "Could not start login")
+      await refreshStatus()
     } finally {
       setBusy(false)
     }
@@ -178,6 +190,33 @@ export function AuthCard() {
             </Button>
           </div>
         </div>
+      ) : windowMode ? (
+        <div className="space-y-4 py-2 text-center">
+          <Loader2 className="mx-auto size-8 animate-spin text-muted-foreground" />
+          <div>
+            <p className="text-sm font-medium">Waiting for login in the browser window…</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Finish signing in there (QR or password). This page detects it automatically and stores
+              the session.
+            </p>
+          </div>
+          {detail ? <p className="text-xs text-amber-600 dark:text-amber-400">{detail}</p> : null}
+          <div className="flex justify-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="focus-glass rounded-xl"
+              disabled={busy}
+              onClick={() => startLogin("qr")}
+            >
+              <QrCode className="size-4" />
+              Use QR code instead
+            </Button>
+            <Button variant="ghost" size="sm" className="focus-glass rounded-xl" disabled={busy} onClick={logout}>
+              Cancel
+            </Button>
+          </div>
+        </div>
       ) : qr ? (
         <div className="space-y-4">
           <div className="flex justify-center">
@@ -199,16 +238,25 @@ export function AuthCard() {
             </p>
           </div>
           {detail ? <p className="text-center text-xs text-amber-600 dark:text-amber-400">{detail}</p> : null}
-          <div className="flex justify-center">
+          <div className="flex justify-center gap-2">
             <Button
               variant="ghost"
               size="sm"
               className="focus-glass rounded-xl"
               disabled={busy}
-              onClick={startLogin}
+              onClick={() => startLogin("qr")}
             >
               {busy ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
               Refresh code
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="focus-glass rounded-xl"
+              disabled={busy}
+              onClick={() => startLogin("window")}
+            >
+              Open login window
             </Button>
           </div>
         </div>
@@ -222,10 +270,20 @@ export function AuthCard() {
             </p>
           </div>
           {detail ? <p className="text-xs text-amber-600 dark:text-amber-400">{detail}</p> : null}
-          <Button className="focus-glass rounded-xl" disabled={busy} onClick={startLogin}>
-            {busy ? <Loader2 className="size-4 animate-spin" /> : <QrCode className="size-4" />}
-            Sign in with TikTok
-          </Button>
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button className="focus-glass rounded-xl" disabled={busy} onClick={() => startLogin("qr")}>
+              {busy ? <Loader2 className="size-4 animate-spin" /> : <QrCode className="size-4" />}
+              Sign in with TikTok
+            </Button>
+            <Button
+              variant="secondary"
+              className="focus-glass rounded-xl"
+              disabled={busy}
+              onClick={() => startLogin("window")}
+            >
+              Open login window
+            </Button>
+          </div>
         </div>
       )}
     </GlassPanel>

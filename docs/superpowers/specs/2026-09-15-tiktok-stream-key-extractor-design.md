@@ -174,6 +174,28 @@ docs/plans/                # implementation plan
 
 Route handlers are thin: validate input, call engine, map typed errors to HTTP codes.
 
+#### QR source, rate limiting, and fallback (added 2026-09-15 after live testing)
+
+- The QR image is read from TikTok's own `GET /passport/web/get_qrcode/` JSON response
+  (`data.qrcode` base64 PNG + `data.expire_time`) by intercepting the login page's network
+  traffic. Periodic element screenshots are only a last-resort fallback (with
+  `animations: 'disabled'`), which removes the UI flicker and eliminates the risk of showing
+  a stale QR while TikTok rotates the code.
+- The page's `GET /passport/web/check_qrconnect/` responses are parsed to classify
+  `waiting | scanned | confirmed | expired | rate_limited | error`. `scanned` surfaces
+  "confirm on your phone" guidance.
+- TikTok enforces an attempt budget on `check_qrconnect` and returns
+  `error_code 7 — "Maximum number of attempts reached"`. When detected, the manager:
+  parks the login page (`about:blank`) so TikTok's ~2×/s polling stops burning the budget,
+  records a rate-limit deadline (~5 min), and reports the state through `status().detail`.
+  `POST /api/auth/login/start` answers `429 LOGIN_RATE_LIMITED` while the cooldown is active.
+- `POST /api/auth/login/start` accepts `{ mode: 'qr' | 'window' }`. In `window` mode the
+  engine opens a headed Chromium at the TikTok login page and only polls for the
+  `sessionid` cookie, so the user can complete login with password or QR inside the window —
+  a reliable path when QR checks are rate-limited.
+- Session detection remains cookie-authoritative (`sessionid` present → persist
+  `storageState` atomically to `.data/session/storageState.json`), polled every second.
+
 ### 5.2 Create live room / extract stream key
 
 `POST /api/live/create { title, category?, ageRestricted? }`

@@ -7,6 +7,7 @@ const STATUS_BY_CODE: Record<string, number> = {
   CAPTCHA: 409,
   NOT_ELIGIBLE: 409,
   NOT_LIVE: 409,
+  LOGIN_RATE_LIMITED: 429,
   EXTRACTION_FAILED: 400,
   LOGIN_PAGE_FAILED: 502,
   ENGINE_UNAVAILABLE: 503,
@@ -45,6 +46,16 @@ export async function readJsonBody<T>(req: Request): Promise<T> {
   }
   try {
     return (await req.json()) as T
+  } catch {
+    throw new EngineError("Request body must be valid JSON", "BAD_REQUEST")
+  }
+}
+
+export async function readOptionalJsonBody<T>(req: Request): Promise<T | null> {
+  const raw = await req.text().catch(() => "")
+  if (!raw.trim()) return null
+  try {
+    return JSON.parse(raw) as T
   } catch {
     throw new EngineError("Request body must be valid JSON", "BAD_REQUEST")
   }
