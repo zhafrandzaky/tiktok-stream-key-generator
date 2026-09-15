@@ -162,8 +162,13 @@ QR/login and chat events are scripted. For manual visual checks, start the dev s
   TikTok's own `webcast/room/create` API with your session, which still returns the RTMP push
   URL + stream key for such accounts (verified live), so try *Create live room* again after
   restarting the app; the download page only appears if the API also refuses. The signed key
-  expires — create a new room to get a fresh one. Ending the stream normally works through the
-  app; if the stop call is refused, end the LIVE from the TikTok app or LIVE Center.
+  expires — create a new room to get a fresh one.
+- **End Stream does not stop the broadcast** — for RTMP streams, stop OBS first: the live ends
+  when the feed stops, and the app finalizes the room through TikTok's `finish_abnormal`
+  endpoint (verified). The button reports success only when TikTok confirms the room is no
+  longer live; if it refuses, you are told to end the LIVE from the TikTok app. The live badge
+  on the dashboard also reconciles with TikTok's room status, so it no longer stays "live"
+  after the broadcast has ended.
 - **Chat says "not live"** — the connector only reads streams that are currently live.
 - **Chat disconnects repeatedly** — the free signing tier of the connector is rate-limited;
   create an Euler Stream key and set `SIGN_API_KEY`.

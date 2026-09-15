@@ -1,7 +1,7 @@
 import { chmod, mkdir, writeFile } from "node:fs/promises"
 import path from "node:path"
 import type { BrowserContext, Locator, Page, Response } from "playwright"
-import { parseRoomCreateResponse } from "@/lib/parsers/room-create"
+import { isLiveRoomStatus, parseRoomCreateInfo, parseRoomCreateResponse } from "@/lib/parsers/room-create"
 import { extractRtmp, RtmpParseError } from "@/lib/parsers/rtmp"
 import type { LiveRoomResult, LiveStatus } from "@/lib/types"
 import type { BrowserManager } from "./browser"
@@ -206,14 +206,37 @@ export function createLiveRoom(deps: {
     return parseRoomCreateResponse(body)
   }
 
-  const stopRoomViaApi = async (context: BrowserContext): Promise<void> => {
-    await context.request
-      .post(`${ROOM_API_BASE}/stop/?${ROOM_API_QUERY.toString()}`, {
+  const fetchRoomCreateInfo = async (
+    context: BrowserContext,
+  ): Promise<{ liveStatus?: number; roomId?: string } | null> => {
+    const response = await context.request
+      .post(`${ROOM_API_BASE}/create_info/?${ROOM_API_QUERY.toString()}`, {
         headers: ROOM_API_HEADERS,
         data: "",
         timeout: 20_000,
       })
-      .catch(() => undefined)
+      .catch(() => null)
+    if (!response || response.status() !== 200) return null
+    const body = await response.text().catch(() => "")
+    return parseRoomCreateInfo(body)
+  }
+
+  const finishRoomViaApi = async (context: BrowserContext, roomId: string): Promise<boolean> => {
+    const response = await context.request
+      .post(`${ROOM_API_BASE}/finish_abnormal/?${ROOM_API_QUERY.toString()}`, {
+        headers: ROOM_API_HEADERS,
+        data: new URLSearchParams({ room_id: roomId }).toString(),
+        timeout: 20_000,
+      })
+      .catch(() => null)
+    if (!response || response.status() !== 200) return false
+    const body = await response.text().catch(() => "")
+    try {
+      const parsed = JSON.parse(body) as { status_code?: unknown }
+      return parsed.status_code === 0
+    } catch {
+      return false
+    }
   }
 
   return {
@@ -409,26 +432,65 @@ export function createLiveRoom(deps: {
     },
 
     async end(): Promise<void> {
-      activeRoom = null
+      const context = deps.browsers.currentContext()
+      if (!context) {
+        activeRoom = null
+        return
+      }
+
+      const info = await fetchRoomCreateInfo(context).catch(() => null)
+      const roomId = activeRoom?.roomId ?? info?.roomId
+      const liveStatus = info?.liveStatus
+
+      if (liveStatus !== undefined && !isLiveRoomStatus(liveStatus)) {
+        activeRoom = null
+        return
+      }
+      if (liveStatus === undefined && !roomId) {
+        activeRoom = null
+        return
+      }
+
+      if (roomId && (await finishRoomViaApi(context, roomId))) {
+        const after = await fetchRoomCreateInfo(context).catch(() => null)
+        if (!after || after.liveStatus === undefined || !isLiveRoomStatus(after.liveStatus)) {
+          activeRoom = null
+          return
+        }
+      }
+
       const page = pageRef
       if (page && !page.isClosed()) {
         const endButton = await findVisible(page, LIVE_SELECTORS.endLive)
         if (endButton) {
           await endButton.click().catch(() => undefined)
           await page.waitForTimeout(1500)
+          activeRoom = null
+          return
         }
       }
-      const context = deps.browsers.currentContext()
-      if (context) {
-        await stopRoomViaApi(context)
-      }
+
+      throw new ExtractionFailedError(
+        "TikTok did not confirm ending the live. Stop Streaming in OBS — an RTMP live ends when the feed stops — then press End LIVE in the TikTok app if it is still shown as live.",
+      )
     },
 
     async status(): Promise<LiveStatus> {
       const session = await deps.auth.session()
+      let live = activeRoom !== null
+
+      const context = deps.browsers.currentContext()
+      if (context && activeRoom) {
+        const info = await fetchRoomCreateInfo(context).catch(() => null)
+        if (info?.liveStatus !== undefined) {
+          live = isLiveRoomStatus(info.liveStatus)
+          if (!live) activeRoom = null
+        }
+      }
+
       return {
         authenticated: session.status === "authenticated",
-        live: activeRoom !== null,
+        live,
         ...(activeRoom ? { room: activeRoom } : {}),
       }
     },

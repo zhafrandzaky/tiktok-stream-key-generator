@@ -264,7 +264,16 @@ download. Each successful call returns a fresh (new) room/key pair.
 7. Response: `LiveRoomResult`. Engine caches the active room in memory only.
 
 `POST /api/live/end` → click end-live control (or call the intercepted end endpoint),
-verify state, clear cache. `GET /api/live/status` → `{ authenticated, live, room? }`.
+verify state, clear cache. `POST /api/live/end` finalizes the room: it reads `webcast/room/create_info` to learn the
+anchor's room id and `live_status` (enum verified from TikTok's own bundle: 1 PREPARE,
+2 ONLINE, 3 PAUSE count as live; 4 OFFLINE, -1 SUSPENDED, -2 LIVE_AND_LEAVE do not), calls
+`webcast/room/finish_abnormal` with the room id (works without request signing — the older
+`room/stop` route does not exist and is answered with `10013 Url does not match`), then
+re-reads `create_info` to confirm. `status()` uses the same check to reconcile the live badge
+so it cannot stay stale after the broadcast ends. Ending an RTMP live still requires stopping
+OBS; the app surfaces a clear message when TikTok refuses to finalize.
+
+`GET /api/live/status` → `{ authenticated, live, room? }`.
 
 ### 5.3 Chat engine
 

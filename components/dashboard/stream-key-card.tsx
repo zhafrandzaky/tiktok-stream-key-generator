@@ -177,7 +177,9 @@ export function StreamKeyCard({
                 <DialogHeader>
                   <DialogTitle>End the live stream?</DialogTitle>
                   <DialogDescription>
-                    This stops the broadcast on TikTok. OBS will keep sending data until you stop it.
+                    The app asks TikTok to end the live room. For RTMP streams the broadcast only
+                    stops once you also press Stop Streaming in OBS. If TikTok refuses the request,
+                    you will be told to end it from the TikTok app.
                   </DialogDescription>
                 </DialogHeader>
                 <DialogFooter>
