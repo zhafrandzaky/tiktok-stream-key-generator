@@ -3,6 +3,8 @@ import { getEngine } from "@/server/engine/singleton"
 
 export function POST() {
   return jsonRoute(async () => {
-    await getEngine().auth.logout()
+    const engine = getEngine()
+    await engine.auth.logout()
+    await engine.chat.disconnect().catch(() => undefined)
   })
 }
