@@ -228,6 +228,18 @@ Route handlers are thin: validate input, call engine, map typed errors to HTTP c
 
 `POST /api/live/create { title, category?, ageRestricted? }`
 
+**Primary path (API-first, added after live testing):** with the authenticated browser
+context, call TikTok's own `POST https://webcast.tiktok.com/webcast/room/create/`
+(`aid=8311&device_platform=web_pc…`, form body `title=…`, same-origin headers). A
+`status_code: 0` response contains `data.id_str` (room id) and
+`data.stream_url.rtmp_push_url` — a signed RTMP URL whose query string (`amun`, `expire`,
+`sign`, …) is **part of the stream key**. `parseRoomCreateResponse` (pure, tested) extracts
+it; the RTMP splitter keeps the signed query inside the key so OBS receives valid
+credentials. Verified live against a real account whose UI only offered the LIVE Studio
+download. Each successful call returns a fresh (new) room/key pair.
+
+**Fallback path (UI automation):** if the API refuses, drive the web studio:
+
 1. Require authenticated session; otherwise 401 `AUTH_REQUIRED`.
 2. Navigate to the TikTok LIVE creator page (exact URL is a Phase 3 discovery item; the
    engine keeps a candidate list and records which one worked).

@@ -75,6 +75,16 @@ describe("extractRtmp", () => {
     })
   })
 
+  it("keeps signed query params inside the stream key (tiktok push urls)", () => {
+    const pushUrl =
+      "rtmp://push-rtmp-l10-sg01.tiktokcdn.com/stage/stream-2137703598951235785?amun=true&expire=6ab2c0b9&sign=c43f167e"
+    expect(extractRtmp(JSON.stringify({ data: { stream_url: { rtmp_push_url: pushUrl } } }))).toEqual({
+      rtmpUrl: "rtmp://push-rtmp-l10-sg01.tiktokcdn.com/stage",
+      streamKey: "stream-2137703598951235785?amun=true&expire=6ab2c0b9&sign=c43f167e",
+      combinedPushUrl: pushUrl,
+    })
+  })
+
   it("ignores non-rtmp strings", () => {
     expect(() => extractRtmp(JSON.stringify({ push_url: "https://example.com/not-rtmp" }))).toThrow(
       RtmpParseError,

@@ -95,13 +95,15 @@ function stripQueryKey(url: string, keys: string[]): { rtmpUrl: string; streamKe
 }
 
 function splitPathKey(url: string): { rtmpUrl: string; streamKey: string } | null {
-  const withoutQuery = url.split("?")[0] ?? url
-  const lastSlash = withoutQuery.lastIndexOf("/")
+  const queryIndex = url.indexOf("?")
+  const pathPart = queryIndex >= 0 ? url.slice(0, queryIndex) : url
+  const queryPart = queryIndex >= 0 ? url.slice(queryIndex) : ""
+  const lastSlash = pathPart.lastIndexOf("/")
   if (lastSlash < 0) return null
-  const streamKey = withoutQuery.slice(lastSlash + 1)
-  if (streamKey.length < 6) return null
-  if (!/[-_\d]/.test(streamKey)) return null
-  return { rtmpUrl: withoutQuery.slice(0, lastSlash), streamKey }
+  const keyPart = pathPart.slice(lastSlash + 1)
+  if (keyPart.length < 6) return null
+  if (!/[-_\d]/.test(keyPart)) return null
+  return { rtmpUrl: pathPart.slice(0, lastSlash), streamKey: keyPart + queryPart }
 }
 
 export function extractRtmp(input: string): {

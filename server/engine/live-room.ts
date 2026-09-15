@@ -1,6 +1,7 @@
 import { chmod, mkdir, writeFile } from "node:fs/promises"
 import path from "node:path"
-import type { Locator, Page, Response } from "playwright"
+import type { BrowserContext, Locator, Page, Response } from "playwright"
+import { parseRoomCreateResponse } from "@/lib/parsers/room-create"
 import { extractRtmp, RtmpParseError } from "@/lib/parsers/rtmp"
 import type { LiveRoomResult, LiveStatus } from "@/lib/types"
 import type { BrowserManager } from "./browser"
@@ -57,6 +58,21 @@ const NOT_ELIGIBLE_PATTERNS = [
 ]
 
 const DOWNLOAD_PAGE_PATTERN = /\/studio\/download/i
+
+const ROOM_API_BASE = "https://webcast.tiktok.com/webcast/room"
+const ROOM_API_QUERY = new URLSearchParams({
+  aid: "8311",
+  device_platform: "web_pc",
+  app_language: "en-US",
+  webcast_language: "en-US",
+  version_code: "180800",
+})
+
+const ROOM_API_HEADERS = {
+  "content-type": "application/x-www-form-urlencoded",
+  origin: "https://www.tiktok.com",
+  referer: "https://www.tiktok.com/",
+}
 
 const CREATE_TIMEOUT_MS = 45_000
 
@@ -174,12 +190,45 @@ export function createLiveRoom(deps: {
     }
   }
 
+  const createRoomViaApi = async (
+    context: BrowserContext,
+    input: { title: string },
+  ): Promise<LiveRoomResult | null> => {
+    const response = await context.request
+      .post(`${ROOM_API_BASE}/create/?${ROOM_API_QUERY.toString()}`, {
+        headers: ROOM_API_HEADERS,
+        data: new URLSearchParams({ title: input.title }).toString(),
+        timeout: 25_000,
+      })
+      .catch(() => null)
+    if (!response || response.status() !== 200) return null
+    const body = await response.text().catch(() => "")
+    return parseRoomCreateResponse(body)
+  }
+
+  const stopRoomViaApi = async (context: BrowserContext): Promise<void> => {
+    await context.request
+      .post(`${ROOM_API_BASE}/stop/?${ROOM_API_QUERY.toString()}`, {
+        headers: ROOM_API_HEADERS,
+        data: "",
+        timeout: 20_000,
+      })
+      .catch(() => undefined)
+  }
+
   return {
     async create(input): Promise<LiveRoomResult> {
       const session = await deps.auth.session()
       if (session.status !== "authenticated") throw new AuthRequiredError()
 
       const context = await deps.browsers.getContext()
+
+      const apiRoom = await createRoomViaApi(context, { title: input.title }).catch(() => null)
+      if (apiRoom) {
+        activeRoom = apiRoom
+        return apiRoom
+      }
+
       let page = context.pages().at(-1) ?? (await context.newPage())
       pageRef = page
 
@@ -360,13 +409,19 @@ export function createLiveRoom(deps: {
     },
 
     async end(): Promise<void> {
-      const page = pageRef
       activeRoom = null
-      if (!page) return
-      const endButton = await findVisible(page, LIVE_SELECTORS.endLive)
-      if (!endButton) return
-      await endButton.click().catch(() => undefined)
-      await page.waitForTimeout(1500)
+      const page = pageRef
+      if (page && !page.isClosed()) {
+        const endButton = await findVisible(page, LIVE_SELECTORS.endLive)
+        if (endButton) {
+          await endButton.click().catch(() => undefined)
+          await page.waitForTimeout(1500)
+        }
+      }
+      const context = deps.browsers.currentContext()
+      if (context) {
+        await stopRoomViaApi(context)
+      }
     },
 
     async status(): Promise<LiveStatus> {

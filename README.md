@@ -157,12 +157,13 @@ QR/login and chat events are scripted. For manual visual checks, start the dev s
 - **"The TikTok session expired"** — click *Switch account* and scan a fresh QR code.
 - **"Not eligible to go live from the web"** — TikTok only exposes web live creation to some
   accounts/regions; use the TikTok LIVE Studio app for those accounts.
-- **"TikTok only offers the LIVE Studio desktop app for this account (no RTMP/OBS access)"** —
-  clicking *Go LIVE* opens `tiktok.com/studio/download` for this account, and LIVE Center
-  (`livecenter.tiktok.com`) has no stream-key page. TikTok does not provide an RTMP key here,
-  so OBS cannot be used as the streaming source; stream from the mobile app or use the LIVE
-  Studio desktop app (Windows). The chat reader and OBS overlay still work for any public
-  stream.
+- **"TikTok only offers the LIVE Studio desktop app for this account"** — this can appear when
+  the web studio UI redirects *Go LIVE* to `tiktok.com/studio/download`. The app first calls
+  TikTok's own `webcast/room/create` API with your session, which still returns the RTMP push
+  URL + stream key for such accounts (verified live), so try *Create live room* again after
+  restarting the app; the download page only appears if the API also refuses. The signed key
+  expires — create a new room to get a fresh one. Ending the stream normally works through the
+  app; if the stop call is refused, end the LIVE from the TikTok app or LIVE Center.
 - **Chat says "not live"** — the connector only reads streams that are currently live.
 - **Chat disconnects repeatedly** — the free signing tier of the connector is rate-limited;
   create an Euler Stream key and set `SIGN_API_KEY`.
