@@ -2,7 +2,7 @@ import { mkdir } from "node:fs/promises"
 import path from "node:path"
 import { chromium } from "playwright"
 
-const base = process.env.BASE ?? "http://localhost:3007"
+const base = process.env.BASE ?? "http://localhost:3100"
 const outDir = process.env.OUT_DIR ?? "/tmp/opencode"
 await mkdir(outDir, { recursive: true })
 

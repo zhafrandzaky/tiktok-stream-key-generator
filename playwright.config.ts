@@ -7,14 +7,14 @@ export default defineConfig({
   retries: 0,
   reporter: [["list"]],
   use: {
-    baseURL: "http://localhost:3100",
+    baseURL: "http://localhost:3110",
     permissions: ["clipboard-read", "clipboard-write"],
     trace: "retain-on-failure",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: "NEXT_DIST_DIR=.next-e2e E2E_MOCK_TIKTOK=1 PORT=3100 npm run dev",
-    url: "http://localhost:3100/api/health",
+    command: "NEXT_DIST_DIR=.next-e2e E2E_MOCK_TIKTOK=1 PORT=3110 npm run dev",
+    url: "http://localhost:3110/api/health",
     reuseExistingServer: false,
     timeout: 120_000,
     stdout: "pipe",

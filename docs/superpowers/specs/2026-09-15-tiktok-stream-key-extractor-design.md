@@ -75,7 +75,7 @@ Package manager: npm. Node >= 20.9 required (Next 16 + connector constraint: >= 
 Next.js route handlers cannot host WebSockets, so the app runs a Node custom server
 (`server/index.ts` via `tsx`) that:
 
-- creates one `node:http` server on `PORT` (default 3000);
+- creates one `node:http` server on `PORT` (default 3100);
 - routes HTTP to the Next request handler;
 - routes WebSocket upgrades whose path is `/ws/chat` to the chat bridge
   (`WebSocketServer({ noServer: true })`), leaving all other upgrades (e.g. Next dev HMR)
@@ -382,7 +382,7 @@ toggles); gift rows are rendered only when a streak ends to avoid duplicate entr
 
 | Env | Default | Purpose |
 |---|---|---|
-| `PORT` | 3000 | HTTP/WS port |
+| `PORT` | 3100 | HTTP/WS port |
 | `DATA_DIR` | `.data` | Session, browser profile, artifacts |
 | `SIGN_API_KEY` | — | Optional Euler Stream key for chat signing reliability |
 | `TIKTOK_HEADLESS` | `1` | Force headed (`0`) for debugging |

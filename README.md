@@ -56,12 +56,12 @@ npm run setup:browser
 ## Run
 
 ```bash
-npm run dev          # development, http://localhost:3000
+npm run dev          # development, http://localhost:3100
 npm run build        # production build
 npm start            # production server
 ```
 
-Open `http://localhost:3000`, sign in with the QR code, then create a live room.
+Open `http://localhost:3100`, sign in with the QR code, then create a live room.
 
 ## Using with OBS Studio
 
@@ -70,7 +70,7 @@ Open `http://localhost:3000`, sign in with the QR code, then create a live room.
 2. Add the chat overlay: Add → Browser → URL:
 
    ```
-   http://localhost:3000/overlay/chat
+   http://localhost:3100/overlay/chat
    ```
 
    or use it as a **Custom Browser Dock** (View → Docks → Custom Browser Docks).
@@ -89,7 +89,7 @@ Overlay query parameters:
 | `showStatus` | `1` | Show connection/status rows |
 | `chip` | `1` | Draw translucent chips behind rows |
 
-Example: `http://localhost:3000/overlay/chat?theme=dark&fontSize=32&max=8&showLikes=1`
+Example: `http://localhost:3100/overlay/chat?theme=dark&fontSize=32&max=8&showLikes=1`
 
 ### Portrait (9:16) streaming for TikTok
 
@@ -110,7 +110,7 @@ Copy `.env.example` to `.env` if you want to override defaults:
 
 | Env | Default | Purpose |
 |---|---|---|
-| `PORT` | `3000` | HTTP + WebSocket port |
+| `PORT` | `3100` | HTTP + WebSocket port |
 | `DATA_DIR` | `.data` | Session state, Chromium profile, debug artifacts, and `session/rate-limit.json` — the persisted QR/login cooldown (`{ until, level }`). Deleting that file resets the local cooldown, but TikTok's server-side limit may still be active. |
 | `SIGN_API_KEY` | — | Optional [Euler Stream](https://www.eulerstream.com) key for the chat connector (higher rate limits) |
 | `TIKTOK_HEADLESS` | `1` | Set to `0` to always open a visible browser window |
@@ -139,9 +139,11 @@ npm run test:e2e     # Playwright, runs against the fake engine
 ```
 
 E2E tests never touch TikTok: `E2E_MOCK_TIKTOK=1` swaps in a deterministic fake engine whose
-QR/login and chat events are scripted. For manual visual checks, start the dev server with
-`E2E_MOCK_TIKTOK=1` and run `BASE=http://localhost:3000 node scripts/smoke-auth.mjs`
-(override the screenshot folder with `OUT_DIR`).
+QR/login and chat events are scripted. Playwright starts its own server on port **3110** with a
+separate Next build directory (`NEXT_DIST_DIR=.next-e2e`), so the suite can run while your dev
+server is up on 3100. For manual visual checks, start the dev server with `E2E_MOCK_TIKTOK=1`
+and run `BASE=http://localhost:3100 node scripts/smoke-auth.mjs` (override the screenshot folder
+with `OUT_DIR`).
 
 ## Troubleshooting
 

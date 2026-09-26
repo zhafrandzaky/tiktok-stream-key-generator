@@ -6,7 +6,7 @@ import { createFakeEngine } from "./engine/fake-engine"
 import { setEngine } from "./engine/singleton"
 import { createChatBridge } from "./ws/chat-bridge"
 
-const port = Number(process.env.PORT ?? 3000)
+const port = Number(process.env.PORT ?? 3100)
 const host = process.env.HOST ?? "127.0.0.1"
 const dev = process.env.NODE_ENV !== "production"
 
