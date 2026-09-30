@@ -10,6 +10,7 @@ import type { LiveRoomResult, LiveStatus } from "@/lib/types"
 export function LiveStudio() {
   const [room, setRoom] = useState<LiveRoomResult | null>(null)
   const [live, setLive] = useState(false)
+  const [qualityKey, setQualityKey] = useState("AUTO")
 
   useEffect(() => {
     const id = setTimeout(() => {
@@ -28,6 +29,8 @@ export function LiveStudio() {
       <StatusBar live={live} />
       <BroadcastForm
         disabled={live}
+        qualityKey={qualityKey}
+        onQualityChange={setQualityKey}
         onCreated={(created) => {
           setRoom(created)
           setLive(true)
@@ -35,6 +38,7 @@ export function LiveStudio() {
       />
       <StreamKeyCard
         room={room}
+        qualityKey={qualityKey}
         onEnded={() => {
           setRoom(null)
           setLive(false)

@@ -27,10 +27,32 @@ export function parseRoomCreateResponse(body: string): LiveRoomResult | null {
   }
 
   const roomId = typeof data.id_str === "string" && data.id_str.length > 0 ? data.id_str : undefined
+
+  const streamUrl =
+    typeof data.stream_url === "object" && data.stream_url !== null
+      ? (data.stream_url as Record<string, unknown>)
+      : {}
+
+  const candidateResolutions = Array.isArray(streamUrl.candidate_resolution)
+    ? streamUrl.candidate_resolution.filter((item): item is string => typeof item === "string")
+    : undefined
+
+  const nameMap =
+    typeof streamUrl.resolution_name === "object" && streamUrl.resolution_name !== null
+      ? (streamUrl.resolution_name as Record<string, unknown>)
+      : null
+  const resolutionOptions = nameMap
+    ? Object.entries(nameMap)
+        .filter((entry): entry is [string, string] => typeof entry[1] === "string")
+        .map(([key, label]) => ({ key, label }))
+    : undefined
+
   return {
     ...rtmp,
     ...(roomId ? { roomId } : {}),
     applied: ["title"],
+    ...(candidateResolutions && candidateResolutions.length > 0 ? { candidateResolutions } : {}),
+    ...(resolutionOptions && resolutionOptions.length > 0 ? { resolutionOptions } : {}),
   }
 }
 

@@ -94,7 +94,6 @@ Example: `http://localhost:3100/overlay/chat?theme=dark&fontSize=32&max=8&showLi
 ### Portrait (9:16) streaming for TikTok
 
 The stream key is orientation-agnostic — set the canvas in OBS:
-
 1. **Settings → Video**: Base (Canvas) `1080x1920`, Output (Scaled) `1080x1920`
    (or `720x1280`), FPS `30`, then accept the source-reset prompt.
 2. Right-click each source → **Transform → Fit to Screen** (or *Stretch to Screen* to fill,
@@ -103,6 +102,33 @@ The stream key is orientation-agnostic — set the canvas in OBS:
    (`2500–3500` for 720×1280), keyframe `1–2s`, x264 `veryfast` or NVENC `Quality`,
    AAC `128 Kbps`.
 4. Test with **Start Virtual Camera** before going live.
+
+### Stream quality (up to 1080p60 / 2K)
+
+The **Stream quality** dropdown in *Broadcast setup* selects your encoder target; the chosen
+preset appears on the *OBS credentials* card (copyable) together with the tiers your account
+actually offers. TikTok reports these tiers in `room/create`:
+
+| Tier key | TikTok label | Portrait size | FPS | Bitrate |
+|---|---|---|---|---|
+| `SD1` | 360p | 360 × 640 | 30 | 1200 kbps |
+| `SD2` | 540p | 540 × 960 | 30 | 2500 kbps |
+| `HD1` | 720p | 720 × 1280 | 30 | 4000 kbps |
+| `FULL_HD1` | 1080p | 1080 × 1920 | 30 | 6000 kbps |
+| `pm_mt_video_720p60` | 720p60 | 720 × 1280 | 60 | 4500 kbps |
+| `pm_mt_video_1080p60` | 1080p60 | 1080 × 1920 | 60 | 8000 kbps |
+| `ttlive_videoQuality_option_2k` | 2K | 1440 × 2560 | 30 | 10000 kbps |
+
+Notes (verified against the live API):
+
+- `room/create` has **no resolution parameter** — seven candidate names/tier keys were tested
+  and `push_resolution` never changed. The resolution is whatever your encoder sends; TikTok
+  transcodes it into the ladder above.
+- Your account's available tiers come from `candidate_resolution` in the same response and are
+  shown on the credentials card. If you pick a tier that is not listed, the card warns you
+  (e.g. *available: 360p, 540p, 720p, 1080p*).
+- If a stream is stuck at a lower quality, check OBS **Settings → Video → Output (Scaled)
+  Resolution** first; the encoder, not TikTok, decides the pushed resolution.
 
 ## Configuration
 

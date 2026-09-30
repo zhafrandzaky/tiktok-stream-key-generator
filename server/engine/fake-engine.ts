@@ -26,6 +26,16 @@ const FAKE_ROOM: LiveRoomResult = {
   combinedPushUrl: "rtmp://fake.push.example.com/live/sk_fake_1234567890",
   roomId: "fake-room",
   applied: ["title"],
+  candidateResolutions: ["SD1", "SD2", "HD1", "FULL_HD1"],
+  resolutionOptions: [
+    { key: "AUTO", label: "AUTO" },
+    { key: "SD1", label: "360p" },
+    { key: "SD2", label: "540p" },
+    { key: "HD1", label: "720p" },
+    { key: "FULL_HD1", label: "1080p" },
+    { key: "pm_mt_video_1080p60", label: "1080p60" },
+    { key: "ttlive_videoQuality_option_2k", label: "2K" },
+  ],
 }
 
 export function createFakeEngine(options: FakeEngineOptions = {}): EngineHandle {

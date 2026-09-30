@@ -20,6 +20,7 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { BorderBeam } from "@/components/ui/border-beam"
 import { apiPost } from "@/lib/api-client"
+import { buildQualityOptions, obsPresetText } from "@/lib/stream-quality"
 import type { LiveRoomResult } from "@/lib/types"
 
 function maskKey(key: string): string {
@@ -31,9 +32,11 @@ function maskKey(key: string): string {
 
 export function StreamKeyCard({
   room,
+  qualityKey,
   onEnded,
 }: {
   room: LiveRoomResult | null
+  qualityKey: string
   onEnded: () => void
 }) {
   const [revealed, setRevealed] = useState(false)
@@ -41,6 +44,20 @@ export function StreamKeyCard({
   const [busy, setBusy] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const reduceMotion = useReducedMotion()
+
+  const qualityOptions = room
+    ? buildQualityOptions({
+        resolutionOptions: Object.fromEntries(
+          (room.resolutionOptions ?? []).map((option) => [option.key, option.label]),
+        ),
+        candidateResolutions: room.candidateResolutions,
+      })
+    : []
+  const selectedQuality =
+    qualityOptions.find((option) => option.key === qualityKey) ?? qualityOptions[0]
+  const tierLabels = (room?.candidateResolutions ?? [])
+    .map((key) => qualityOptions.find((option) => option.key === key)?.label ?? key)
+    .join(", ")
 
   useEffect(() => {
     if (!revealed) return
@@ -164,6 +181,25 @@ export function StreamKeyCard({
               className="focus-glass shrink-0 rounded-lg"
             />
           </div>
+
+          {selectedQuality ? (
+            <div className="rounded-xl border border-border/60 bg-background/40 p-3">
+              <p className="text-xs text-muted-foreground">OBS video preset</p>
+              <div className="mt-1 flex items-start justify-between gap-2">
+                <p className="min-w-0 text-sm">{obsPresetText(selectedQuality)}</p>
+                <CopyButton
+                  value={obsPresetText(selectedQuality)}
+                  label="OBS video preset"
+                  className="focus-glass shrink-0 rounded-lg"
+                />
+              </div>
+              {!selectedQuality.available ? (
+                <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
+                  Not in your account tiers{tierLabels ? ` (available: ${tierLabels})` : ""}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="flex justify-end pt-1">
             <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>

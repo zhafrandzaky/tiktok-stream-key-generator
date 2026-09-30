@@ -1,5 +1,9 @@
-import { expect, test } from "./fixtures"
 import { ensureSignedIn } from "./helpers"
+import { expect, resetServerState, test } from "./fixtures"
+
+test.beforeEach(async ({ request }) => {
+  await resetServerState(request)
+})
 
 test("signs in through the QR flow", async ({ page }) => {
   await page.goto("/")

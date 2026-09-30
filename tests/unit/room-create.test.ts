@@ -10,7 +10,11 @@ function fixture(overrides: Record<string, unknown> = {}): string {
     data: {
       id_str: "7685821721445796616",
       title: "Test OBS",
-      stream_url: { rtmp_push_url: PUSH_URL },
+      stream_url: {
+        rtmp_push_url: PUSH_URL,
+        candidate_resolution: ["SD1", "SD2", "HD1", "FULL_HD1"],
+        resolution_name: { AUTO: "AUTO", HD1: "720p", FULL_HD1: "1080p" },
+      },
       ...overrides,
     },
   })
@@ -24,6 +28,12 @@ describe("parseRoomCreateResponse", () => {
       combinedPushUrl: PUSH_URL,
       roomId: "7685821721445796616",
       applied: ["title"],
+      candidateResolutions: ["SD1", "SD2", "HD1", "FULL_HD1"],
+      resolutionOptions: [
+        { key: "AUTO", label: "AUTO" },
+        { key: "HD1", label: "720p" },
+        { key: "FULL_HD1", label: "1080p" },
+      ],
     })
   })
 

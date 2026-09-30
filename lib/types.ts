@@ -24,12 +24,19 @@ export type ChatEvent =
   | { type: "viewerCount"; count: number; total?: number; at: number }
   | { type: "streamEnd"; reason?: string; at: number }
 
+export type ResolutionOption = {
+  key: string
+  label: string
+}
+
 export type LiveRoomResult = {
   rtmpUrl: string
   streamKey: string
   combinedPushUrl?: string
   roomId?: string
   applied: string[]
+  candidateResolutions?: string[]
+  resolutionOptions?: ResolutionOption[]
 }
 
 export type SessionState = {

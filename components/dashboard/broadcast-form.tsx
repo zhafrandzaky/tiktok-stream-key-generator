@@ -17,6 +17,7 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { apiPost } from "@/lib/api-client"
+import { buildQualityOptions } from "@/lib/stream-quality"
 import type { LiveRoomResult } from "@/lib/types"
 
 const CATEGORIES = [
@@ -31,15 +32,20 @@ const CATEGORIES = [
 
 export function BroadcastForm({
   disabled,
+  qualityKey,
+  onQualityChange,
   onCreated,
 }: {
   disabled?: boolean
+  qualityKey: string
+  onQualityChange: (key: string) => void
   onCreated: (room: LiveRoomResult) => void
 }) {
   const [title, setTitle] = useState("")
   const [category, setCategory] = useState<string>("Talk")
   const [ageRestricted, setAgeRestricted] = useState(false)
   const [busy, setBusy] = useState(false)
+  const qualityOptions = buildQualityOptions({})
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -98,6 +104,26 @@ export function BroadcastForm({
               ))}
             </SelectContent>
           </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="stream-quality">Stream quality</Label>
+          <Select value={qualityKey} onValueChange={onQualityChange}>
+            <SelectTrigger id="stream-quality" className="focus-glass w-full rounded-xl">
+              <SelectValue placeholder="Choose quality" />
+            </SelectTrigger>
+            <SelectContent className="glass-strong rounded-xl">
+              {qualityOptions.map((option) => (
+                <SelectItem key={option.key} value={option.key}>
+                  {option.label} · {option.width}×{option.height} · {option.fps} fps · {option.bitrateKbps} kbps
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            TikTok transcodes server-side — use the same numbers in OBS. The preset is shown with your
+            credentials.
+          </p>
         </div>
 
         <div className="flex items-center justify-between rounded-xl border border-border/60 px-3 py-2.5">

@@ -1,5 +1,9 @@
-import { expect, test } from "./fixtures"
 import { createLiveRoom, ensureSignedIn } from "./helpers"
+import { expect, resetServerState, test } from "./fixtures"
+
+test.beforeEach(async ({ request }) => {
+  await resetServerState(request)
+})
 
 test("creates a live room, masks and copies the stream key, then ends the stream", async ({ page }) => {
   await ensureSignedIn(page)
@@ -32,6 +36,17 @@ test("shows viewer and like counters", async ({ page }) => {
   await expect(page.getByTestId("viewer-count")).toContainText("128", { timeout: 10_000 })
   await expect(page.getByTestId("viewer-total")).toContainText("1,543")
   await expect(page.getByTestId("like-total")).toContainText("2,345")
+})
+
+test("sets stream quality and shows the OBS video preset", async ({ page }) => {
+  await ensureSignedIn(page)
+  await page.locator("#stream-quality").click()
+  await page.getByRole("option", { name: /1080p60/ }).click()
+  await createLiveRoom(page, "Quality test")
+  await expect(
+    page.getByText("1080 × 1920 (portrait) · 60 fps · 8000 kbps CBR · keyframe 1s"),
+  ).toBeVisible()
+  await expect(page.getByText(/Not in your account tiers/)).toBeVisible()
 })
 
 test("surfaces a sign-in error when creating a room while unauthenticated", async ({ page }) => {

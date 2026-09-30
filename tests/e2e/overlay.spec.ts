@@ -1,4 +1,8 @@
-import { expect, test } from "./fixtures"
+import { expect, resetServerState, test } from "./fixtures"
+
+test.beforeEach(async ({ request }) => {
+  await resetServerState(request)
+})
 
 test("renders live events on a transparent background", async ({ page, request }) => {
   const response = await request.post("/api/chat/connect", { data: { username: "demo" } })
