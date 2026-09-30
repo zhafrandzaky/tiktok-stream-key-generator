@@ -107,17 +107,18 @@ The stream key is orientation-agnostic — set the canvas in OBS:
 
 The **Stream quality** dropdown in *Broadcast setup* selects your encoder target; the chosen
 preset appears on the *OBS credentials* card (copyable) together with the tiers your account
-actually offers. TikTok reports these tiers in `room/create`:
+actually offers. Use the **Orientation** switch next to it to get portrait or landscape
+numbers. TikTok reports these tiers in `room/create`:
 
-| Tier key | TikTok label | Portrait size | FPS | Bitrate |
-|---|---|---|---|---|
-| `SD1` | 360p | 360 × 640 | 30 | 1200 kbps |
-| `SD2` | 540p | 540 × 960 | 30 | 2500 kbps |
-| `HD1` | 720p | 720 × 1280 | 30 | 4000 kbps |
-| `FULL_HD1` | 1080p | 1080 × 1920 | 30 | 6000 kbps |
-| `pm_mt_video_720p60` | 720p60 | 720 × 1280 | 60 | 4500 kbps |
-| `pm_mt_video_1080p60` | 1080p60 | 1080 × 1920 | 60 | 8000 kbps |
-| `ttlive_videoQuality_option_2k` | 2K | 1440 × 2560 | 30 | 10000 kbps |
+| Tier key | TikTok label | Portrait | Landscape | FPS | Bitrate |
+|---|---|---|---|---|---|
+| `SD1` | 360p | 360 × 640 | 640 × 360 | 30 | 1200 kbps |
+| `SD2` | 540p | 540 × 960 | 960 × 540 | 30 | 2500 kbps |
+| `HD1` | 720p | 720 × 1280 | 1280 × 720 | 30 | 4000 kbps |
+| `FULL_HD1` | 1080p | 1080 × 1920 | 1920 × 1080 | 30 | 6000 kbps |
+| `pm_mt_video_720p60` | 720p60 | 720 × 1280 | 1280 × 720 | 60 | 4500 kbps |
+| `pm_mt_video_1080p60` | 1080p60 | 1080 × 1920 | 1920 × 1080 | 60 | 8000 kbps |
+| `ttlive_videoQuality_option_2k` | 2K | 1440 × 2560 | 2560 × 1440 | 30 | 10000 kbps |
 
 Notes (verified against the live API):
 

@@ -49,6 +49,17 @@ test("sets stream quality and shows the OBS video preset", async ({ page }) => {
   await expect(page.getByText(/Not in your account tiers/)).toBeVisible()
 })
 
+test("switches the OBS preset to landscape", async ({ page }) => {
+  await ensureSignedIn(page)
+  await page.getByRole("button", { name: "landscape", exact: true }).click()
+  await page.locator("#stream-quality").click()
+  await page.getByRole("option", { name: /1080p · 1920×1080/ }).click()
+  await createLiveRoom(page, "Landscape test")
+  await expect(
+    page.getByText("1920 × 1080 (landscape) · 30 fps · 6000 kbps CBR · keyframe 1s"),
+  ).toBeVisible()
+})
+
 test("surfaces a sign-in error when creating a room while unauthenticated", async ({ page }) => {
   await page.route("**/api/live/create", (route) =>
     route.fulfill({

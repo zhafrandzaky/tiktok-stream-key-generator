@@ -40,7 +40,9 @@
     ".next-ui/types/**/*.ts",
     ".next-ui/dev/types/**/*.ts",
     ".next-porttest/types/**/*.ts",
-    ".next-porttest/dev/types/**/*.ts"
+    ".next-porttest/dev/types/**/*.ts",
+    ".next-ui2/types/**/*.ts",
+    ".next-ui2/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

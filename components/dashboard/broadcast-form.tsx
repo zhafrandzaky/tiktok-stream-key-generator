@@ -17,8 +17,9 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { apiPost } from "@/lib/api-client"
-import { buildQualityOptions } from "@/lib/stream-quality"
+import { buildQualityOptions, type Orientation } from "@/lib/stream-quality"
 import type { LiveRoomResult } from "@/lib/types"
+import { cn } from "@/lib/utils"
 
 const CATEGORIES = [
   "Talk",
@@ -34,18 +35,22 @@ export function BroadcastForm({
   disabled,
   qualityKey,
   onQualityChange,
+  orientation,
+  onOrientationChange,
   onCreated,
 }: {
   disabled?: boolean
   qualityKey: string
   onQualityChange: (key: string) => void
+  orientation: Orientation
+  onOrientationChange: (orientation: Orientation) => void
   onCreated: (room: LiveRoomResult) => void
 }) {
   const [title, setTitle] = useState("")
   const [category, setCategory] = useState<string>("Talk")
   const [ageRestricted, setAgeRestricted] = useState(false)
   const [busy, setBusy] = useState(false)
-  const qualityOptions = buildQualityOptions({})
+  const qualityOptions = buildQualityOptions({ orientation })
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -104,6 +109,28 @@ export function BroadcastForm({
               ))}
             </SelectContent>
           </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Orientation</Label>
+          <div className="flex gap-1">
+            {(["portrait", "landscape"] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={orientation === value}
+                className={cn(
+                  "focus-glass rounded-xl border px-3 py-1.5 text-xs capitalize transition-colors",
+                  orientation === value
+                    ? "border-white/20 bg-secondary text-secondary-foreground"
+                    : "border-transparent text-muted-foreground hover:bg-secondary/50",
+                )}
+                onClick={() => onOrientationChange(value)}
+              >
+                {value}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="space-y-2">

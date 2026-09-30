@@ -5,12 +5,14 @@ import { BroadcastForm } from "@/components/dashboard/broadcast-form"
 import { StatusBar } from "@/components/dashboard/status-bar"
 import { StreamKeyCard } from "@/components/dashboard/stream-key-card"
 import { apiGet } from "@/lib/api-client"
+import type { Orientation } from "@/lib/stream-quality"
 import type { LiveRoomResult, LiveStatus } from "@/lib/types"
 
 export function LiveStudio() {
   const [room, setRoom] = useState<LiveRoomResult | null>(null)
   const [live, setLive] = useState(false)
   const [qualityKey, setQualityKey] = useState("AUTO")
+  const [orientation, setOrientation] = useState<Orientation>("portrait")
 
   useEffect(() => {
     const id = setTimeout(() => {
@@ -31,6 +33,8 @@ export function LiveStudio() {
         disabled={live}
         qualityKey={qualityKey}
         onQualityChange={setQualityKey}
+        orientation={orientation}
+        onOrientationChange={setOrientation}
         onCreated={(created) => {
           setRoom(created)
           setLive(true)
@@ -39,6 +43,7 @@ export function LiveStudio() {
       <StreamKeyCard
         room={room}
         qualityKey={qualityKey}
+        orientation={orientation}
         onEnded={() => {
           setRoom(null)
           setLive(false)

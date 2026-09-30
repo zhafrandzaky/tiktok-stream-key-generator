@@ -6,8 +6,11 @@ export type QualitySpec = {
   bitrateKbps: number
 }
 
+export type Orientation = "portrait" | "landscape"
+
 export type QualityOption = QualitySpec & {
   available: boolean
+  orientation: Orientation
   width: number
   height: number
 }
@@ -33,7 +36,9 @@ function specFor(key: string, label?: string): QualitySpec {
 export function buildQualityOptions(input: {
   resolutionOptions?: Record<string, string>
   candidateResolutions?: string[]
+  orientation?: Orientation
 }): QualityOption[] {
+  const orientation = input.orientation ?? "portrait"
   const names = input.resolutionOptions ?? {}
   const candidates = new Set(input.candidateResolutions ?? [])
   const keys = Object.keys(names).length > 0 ? Object.keys(names) : QUALITY_SPECS.map((spec) => spec.key)
@@ -44,11 +49,13 @@ export function buildQualityOptions(input: {
 
   return orderedKeys.map((key) => {
     const spec = specFor(key, names[key])
-    const width = spec.shortSide
-    const height = Math.round((spec.shortSide * 16) / 9)
+    const longSide = Math.round((spec.shortSide * 16) / 9)
+    const width = orientation === "portrait" ? spec.shortSide : longSide
+    const height = orientation === "portrait" ? longSide : spec.shortSide
     return {
       ...spec,
       available: candidates.size === 0 || candidates.has(key) || key === "AUTO" || key === "ORIGION",
+      orientation,
       width,
       height,
     }
@@ -60,5 +67,5 @@ export function defaultQualityKey(options: QualityOption[]): string {
 }
 
 export function obsPresetText(option: QualityOption): string {
-  return `${option.width} × ${option.height} (portrait) · ${option.fps} fps · ${option.bitrateKbps} kbps CBR · keyframe 1s`
+  return `${option.width} × ${option.height} (${option.orientation}) · ${option.fps} fps · ${option.bitrateKbps} kbps CBR · keyframe 1s`
 }

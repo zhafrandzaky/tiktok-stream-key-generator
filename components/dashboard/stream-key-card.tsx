@@ -20,7 +20,7 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { BorderBeam } from "@/components/ui/border-beam"
 import { apiPost } from "@/lib/api-client"
-import { buildQualityOptions, obsPresetText } from "@/lib/stream-quality"
+import { buildQualityOptions, obsPresetText, type Orientation } from "@/lib/stream-quality"
 import type { LiveRoomResult } from "@/lib/types"
 
 function maskKey(key: string): string {
@@ -33,10 +33,12 @@ function maskKey(key: string): string {
 export function StreamKeyCard({
   room,
   qualityKey,
+  orientation,
   onEnded,
 }: {
   room: LiveRoomResult | null
   qualityKey: string
+  orientation: Orientation
   onEnded: () => void
 }) {
   const [revealed, setRevealed] = useState(false)
@@ -51,6 +53,7 @@ export function StreamKeyCard({
           (room.resolutionOptions ?? []).map((option) => [option.key, option.label]),
         ),
         candidateResolutions: room.candidateResolutions,
+        orientation,
       })
     : []
   const selectedQuality =

@@ -50,6 +50,14 @@ describe("buildQualityOptions", () => {
     expect(byKey.ttlive_videoQuality_option_2k).toMatchObject({ width: 1440, height: 2560 })
   })
 
+  it("computes landscape dimensions when requested", () => {
+    const options = buildQualityOptions({ resolutionOptions: REAL_MAP, orientation: "landscape" })
+    const byKey = Object.fromEntries(options.map((option) => [option.key, option]))
+    expect(byKey.FULL_HD1).toMatchObject({ width: 1920, height: 1080, orientation: "landscape" })
+    expect(byKey.HD1).toMatchObject({ width: 1280, height: 720 })
+    expect(byKey.ttlive_videoQuality_option_2k).toMatchObject({ width: 2560, height: 1440 })
+  })
+
   it("falls back to the built-in spec list when TikTok sends no map", () => {
     const options = buildQualityOptions({})
     expect(options.map((option) => option.key)).toEqual(QUALITY_SPECS.map((spec) => spec.key))
@@ -69,5 +77,11 @@ describe("obsPresetText", () => {
     const options = buildQualityOptions({ resolutionOptions: REAL_MAP })
     const option = options.find((entry) => entry.key === "pm_mt_video_1080p60")
     expect(option && obsPresetText(option)).toBe("1080 × 1920 (portrait) · 60 fps · 8000 kbps CBR · keyframe 1s")
+  })
+
+  it("labels landscape presets", () => {
+    const options = buildQualityOptions({ resolutionOptions: REAL_MAP, orientation: "landscape" })
+    const option = options.find((entry) => entry.key === "FULL_HD1")
+    expect(option && obsPresetText(option)).toBe("1920 × 1080 (landscape) · 30 fps · 6000 kbps CBR · keyframe 1s")
   })
 })
